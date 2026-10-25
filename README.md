@@ -1,56 +1,128 @@
 # lazywatch
 
-Watch the public rules pages you care about without reading them. Once a day a cron job fetches each page. If nothing changed, the model is never called. If something changed, a local open-weight model (Gemma 3 4B through Ollama) summarises only the changed paragraphs, and the summary is kept only if its quote appears word for word in the new page text. Otherwise you get the raw change, clearly marked unverified. Once a week you read one short markdown digest.
+![lazywatch](docs/cover.png)
+
+Watch the public rules pages you care about without reading them. Once a day a job fetches each page. If nothing changed, the model is never called. If something changed, a local open-weight model (Gemma 3 4B through Ollama) summarises only the changed paragraphs, and the summary is kept only if its quote appears word for word in the new page text. Otherwise you get the raw change, clearly marked unverified. Once a week you read one short markdown digest.
 
 Nothing leaves your machine except the page fetches.
 
-## Run it
+## Run it (the basics, nothing to sign up for)
 
 ```
 ollama pull gemma3:4b
 copy sites.example.json sites.json        # then edit the URLs
 python lazywatch.py check                 # run daily; first run only stores snapshots
 python lazywatch.py digest --days 7 > digest.md
+python lazywatch.py peek                  # what each snapshot actually holds
 python -m unittest                        # 20 tests, no model, no accounts needed
 ```
 
 Python 3.9+, standard library only. Windows Task Scheduler or cron can run `check` daily.
 
-## Durable version (Temporal)
+## Replicate the results on a clean PC
 
-`lazywatch_temporal.py` runs the same check as a Temporal workflow: one activity per site with its own retry policy (5 attempts, 10 s backoff doubling); a page that is dead after 5 attempts is reported, and the other pages still run, so a slow page or a model that is still loading is retried on its own, and a crash halfway through a run resumes with the finished sites kept. Everything stays on your machine with the free local dev server.
+This is the full path from an empty Windows machine to the numbers in the write-up (page checks, model wakes, verified quotes, the Temporal retry and worker-kill demos, the Browserbase comparison and the Tiger Data search). Commands are PowerShell; on macOS or Linux use the same commands with `cp` for `copy` and `export NAME=value` for `$env:NAME = "value"`.
+
+**1. Install the tools**
+
+- Python 3.9 or newer, with `python` on the PATH.
+- [Ollama](https://ollama.com), then the two open-weight models:
+
+  ```
+  ollama pull gemma3:4b
+  ollama pull embeddinggemma
+  ```
+
+  A GPU with 4 GB of memory runs Gemma 3 4B comfortably; it also runs on CPU, just slower (a cold start took about 45 s on the laptop used for the write-up, a warm call about 12 s).
+- The [Temporal CLI](https://docs.temporal.io/cli) (`temporal.exe`), for the durable version. Open source, no account.
+- Git.
+
+**2. Get the code and the Python packages**
 
 ```
-pip install temporalio
-temporal server start-dev              # https://docs.temporal.io/cli, open source, no account
-python lazywatch_temporal.py worker    # terminal 1, keep running
-python lazywatch_temporal.py once      # terminal 2: run a check now
-python lazywatch_temporal.py schedule  # or create the daily 06:00 schedule
+git clone https://github.com/habsology/lazywatch
+cd lazywatch
+pip install temporalio browserbase playwright "psycopg[binary]" pgvector
 ```
 
-The dev server UI at http://localhost:8233 shows every run, retry and failure.
+`temporalio` is for the workflow, `browserbase` and `playwright` for the JavaScript pages, `psycopg` and `pgvector` for the Tiger Data memory. Each is optional: the tool keeps working when a package or its service is missing, and the tests skip what is not installed. No local browser download is needed; Browserbase runs the browser.
 
-## JavaScript pages (Browserbase)
-
-Some rules pages render their text in the browser, so a plain fetch sees almost nothing. Mark those `"render": true` in `sites.json` and lazywatch opens them in a real browser on Browserbase. `"render": "auto"` tries the plain download first and switches to the browser only if the page refuses it (a 404 is not a refusal: a dead page stays dead instead of snapshotting the error page); the choice is remembered so later checks compare like with like. If a page's fetch path ever changes, its first snapshot on the new path replaces the old one and no change is reported, because a plain fetch and a browser see different text. Set `BROWSERBASE_API_KEY` (and `BROWSERBASE_PROJECT_ID` if your dashboard shows one). The free plan is enough for a few pages a day.
+**3. Choose the pages**
 
 ```
+copy sites.example.json sites.json
+```
+
+`sites.example.json` is the list used for the write-up: short-term rental rules for Montreal, Toronto and British Columbia, Airbnb's hosting page for Canada, the Canada Gazette Part I index, the Government of Canada news page, the federal travel advisories, and the Environment Canada weather feed for Montreal as the control page (it changes every hour, so the model has to wake up for it). Keep it or edit it. A page marked `"render": true` always goes through Browserbase; `"render": "auto"` tries the plain fetch first.
+
+**4. Run the plain version once**
+
+```
+python lazywatch.py check      # first run: snapshots only
+python lazywatch.py peek       # confirm each snapshot holds real text, not a "needs JavaScript" shell or a 404 page
+```
+
+Pages marked `"render"` need Browserbase (step 6); without the key they fail and the rest still run.
+
+**5. The durable version (Temporal)**
+
+Three terminals:
+
+```
+temporal server start-dev                # terminal 1, leave it running; UI at http://localhost:8233
+python lazywatch_temporal.py worker      # terminal 2, leave it running
+python lazywatch_temporal.py once        # terminal 3: one full check, every page as its own activity
+```
+
+`once` prints one line per page and exits. Run it once a day (or `python lazywatch_temporal.py schedule` creates a 06:00 daily schedule in the dev server). Every run, attempt and failure is in the UI.
+
+The two demos from the write-up:
+
+- **A dead page is retried, then reported, and the rest still finish.** `python lazywatch_temporal.py once sites.demo-retry.json` checks `example.invalid`: 5 attempts with 10 s backoff doubling (about 2 min 31 s), then "failed after 5 attempts". With the real list, add that entry to `sites.json` to see the other pages complete around it.
+- **A killed worker loses nothing.** Start `once`, and about 10 seconds in close the worker terminal (Ctrl+C, or `Stop-Process` on it). The activity it was running fails with it. Start `python lazywatch_temporal.py worker` again: the workflow resumes on the new worker, retries only that activity, and the finished pages are not fetched twice. The UI's event history shows the failed attempt and the retry.
+
+**6. JavaScript pages (Browserbase)**
+
+Create a free Browserbase account, then in the terminal that runs the worker or the check:
+
+```
+$env:BROWSERBASE_API_KEY = "your key"
+$env:BROWSERBASE_PROJECT_ID = "your project id"     # only if your dashboard shows one
 python lazywatch_browser.py compare https://www.canada.ca/en/news.html
 ```
 
-prints how many paragraphs the plain fetch saw against the real browser. On our first run, canada.ca refused the plain download and the browser read 190 paragraphs.
+`compare` prints how many paragraphs the plain fetch saw against the real browser. On our runs the plain fetch of that page was refused and the browser read 190 paragraphs. With the key set, `check` and `once` use the browser for any page marked `"render"`.
 
-## Memory (Tiger Data)
+**7. Memory and search (Tiger Data)**
 
-With `TIGER_DATABASE_URL` set to a Tiger Cloud Postgres service, every check and every change is stored. Changes get an embedding from a local open-weight model (`ollama pull embeddinggemma`), so you can ask whether a rule has changed before and get both keyword and meaning matches, fused by reciprocal rank:
+Create a Tiger Cloud Postgres service (the free tier is enough; pgvector is available on it), copy its connection string, then:
 
 ```
-python lazywatch_store.py init
-python lazywatch_store.py stats
+$env:TIGER_DATABASE_URL = "postgres://..."
+python lazywatch_store.py init           # tables and the vector extension
+python lazywatch_store.py backfill       # optional: load the checks already in state/
+python lazywatch_store.py stats          # pages, checks, model wakes
 python lazywatch_store.py search "licence fee"
+python lazywatch_store.py search "is it getting colder outside"
 ```
 
-Without the variable set, lazywatch keeps working from the local `state/` folder.
+With the variable set, every `check` or `once` records each page check and each change (with an embedding from embeddinggemma). `search` fuses full-text rank and pgvector cosine rank with reciprocal rank fusion, so a paraphrase with no word in common still finds the change. Without the variable, lazywatch keeps working from the local `state/` folder.
+
+**8. Read the result**
+
+```
+python lazywatch.py digest --days 7 > digest.md
+```
+
+The first line is the effort line: `N page checks in 7 days, model woken M times.` Then one entry per change, with the model's sentence and its quote, or the raw diff marked NOT verified. Your numbers will differ from the write-up's, because they depend on when your pages change; the weather feed is there so that at least one page always does.
+
+## Durable version (Temporal), in short
+
+`lazywatch_temporal.py` runs the same check as a Temporal workflow: one activity per site with its own retry policy (5 attempts, 10 s backoff doubling); a page that is dead after 5 attempts is reported, and the other pages still run, so a slow page or a model that is still loading is retried on its own, and a crash halfway through a run resumes with the finished sites kept. Everything stays on your machine with the free local dev server.
+
+## JavaScript pages (Browserbase), in short
+
+Some rules pages render their text in the browser, so a plain fetch sees almost nothing. Mark those `"render": true` in `sites.json` and lazywatch opens them in a real browser on Browserbase. `"render": "auto"` tries the plain download first and switches to the browser only if the page refuses it (a 404 is not a refusal: a dead page stays dead instead of snapshotting the error page); the choice is remembered so later checks compare like with like. If a page's fetch path ever changes, its first snapshot on the new path replaces the old one and no change is reported, because a plain fetch and a browser see different text.
 
 ## Limits
 
