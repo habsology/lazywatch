@@ -1,6 +1,6 @@
 # lazywatch
 
-![lazywatch](docs/cover.png)
+![lazywatch](docs/cover-v2.png)
 
 Watch the public rules pages you care about without reading them. Once a day a job fetches each page. If nothing changed, the model is never called. If something changed, a local open-weight model (Gemma 3 4B through Ollama) summarises only the changed paragraphs, and the summary is kept only if its quote appears word for word in the new page text. Otherwise you get the raw change, clearly marked unverified. Once a week you read one short markdown digest.
 
