@@ -6,6 +6,8 @@ Watch the public rules pages you care about without reading them. Once a day a j
 
 Nothing leaves your machine except the page fetches.
 
+The write-up, with the weekend's numbers (68 page checks, 5 model calls, 4 verified quotes, 1 thrown out): [lazywatch on DEV](https://dev.to/mtlmatt/lazywatch-68-page-checks-5-model-calls-0-bylaws-read-by-me-20ej).
+
 ## Run it (the basics, nothing to sign up for)
 
 ```
