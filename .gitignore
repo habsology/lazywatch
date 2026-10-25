@@ -1,0 +1,7 @@
+state/
+demo-output/
+demo-output.zip
+sites.json
+lazywatch.db*
+__pycache__/
+*.pyc

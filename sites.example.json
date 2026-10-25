@@ -1,0 +1,10 @@
+[
+  {"name": "Canada Gazette Part I, 2026 index (new issue every Friday 2 pm ET)", "url": "https://gazette.gc.ca/rp-pr/p1/2026/index-eng.html"},
+  {"name": "British Columbia short-term rental rules (province)", "url": "https://www2.gov.bc.ca/gov/content/housing-tenancy/short-term-rentals"},
+  {"name": "Montreal short-term tourist rentals", "url": "https://montreal.ca/en/topics/short-term-tourist-rentals"},
+  {"name": "Toronto short-term rental operators", "url": "https://www.toronto.ca/community-people/housing-shelter/short-term-rentals/short-term-rental-operators-hosts/"},
+  {"name": "Government of Canada news releases (changes daily)", "url": "https://www.canada.ca/en/news.html", "render": "auto"},
+  {"name": "Airbnb responsible hosting in Canada (JavaScript page)", "url": "https://www.airbnb.ca/help/article/1389", "render": true},
+  {"name": "Environment Canada weather for Montreal: warnings, current conditions, forecast (Atom feed, changes hourly; the control page that always changes)", "url": "https://weather.gc.ca/rss/weather/45.529_-73.562_e.xml"},
+  {"name": "Government of Canada travel advisories", "url": "https://travel.gc.ca/travelling/advisories", "render": "auto"}
+]
