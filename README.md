@@ -133,4 +133,8 @@ Some rules pages render their text in the browser, so a plain fetch sees almost 
 - A 4B model can misread a change. The verbatim-quote check catches invented text, not a wrong interpretation, so read the quote.
 - Be polite: one fetch per page per day, and respect each site's terms.
 
+## Gemma terms of use
+
+This project does not include or redistribute any Gemma weights. If you pull Gemma (for example `ollama pull gemma3:4b`), the model is provided by Google under the [Gemma Terms of Use](https://ai.google.dev/gemma/terms) and the [Gemma Prohibited Use Policy](https://ai.google.dev/gemma/prohibited_use_policy), which are separate from this project's MIT licence. Read them before using the output commercially. Output from the model is yours to use under those terms; you are responsible for what you generate with it.
+
 MIT licence.
