@@ -16,6 +16,7 @@ anyone (there is simply no code for it).
     python lazywatch_ghost.py                    # post (needs BLUESKY_HANDLE and BLUESKY_APP_PASSWORD)
     python lazywatch_ghost.py --only GitHub      # one service
     python lazywatch_ghost.py graveyard          # what the ghost has seen so far
+    python lazywatch_ghost.py rehearse           # verse for each service's LAST incident, posted nowhere
 
 Optional: BROWSERBASE_API_KEY puts a screenshot of the status page on each post's link
 card; TIGER_DATABASE_URL keeps every haunting in the Tiger Data memory (lazywatch_store.py).
@@ -443,9 +444,50 @@ def graveyard(state):
     return "\n".join(out)
 
 
+def last_incident(site, fetch=fetch_feed):
+    """The most recent incident in a Statuspage history feed (incidents.json), resolved or not:
+    the ghost's rehearsal material on a quiet day."""
+    if site.get("format", "statuspage") != "statuspage":
+        return None
+    data = fetch(dict(site, url=site["url"].replace("summary.json", "incidents.json")))
+    for inc in data.get("incidents") or []:
+        found = _statuspage(site, {"incidents": [dict(inc, status="investigating")]})
+        if found:
+            return found[0]
+    return None
+
+
+def rehearse(sites, ask=ask_ghost, fetch=fetch_feed, out=print):
+    """Dry run on yesterday's news: write verse for each service's latest incident, post nothing, touch no state."""
+    written = 0
+    for site in sites:
+        try:
+            inc = last_incident(site, fetch)
+        except Exception as exc:
+            out(f"{site['name']}: history unavailable ({exc.__class__.__name__})")
+            continue
+        if not inc:
+            continue
+        form = pick_form(inc["id"])
+        try:
+            reply = ask(inc, form)
+        except Exception as exc:
+            out(f"{site['name']}: model unavailable ({exc.__class__.__name__})")
+            continue
+        poem = clean_poem(reply)
+        if not poem or too_mean(poem):
+            out(f"{site['name']}: poem rejected ({'empty' if not poem else 'tone'})")
+            continue
+        quote, verified = verify_quote(reply, inc)
+        out(f"--- {site['name']} ({form}, quote {'verified' if verified else 'NOT verified, title used'}; {inc['url']})")
+        out(compose(inc, form, poem, quote))
+        written += 1
+    return written
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("command", nargs="?", default="haunt", choices=["haunt", "graveyard"])
+    ap.add_argument("command", nargs="?", default="haunt", choices=["haunt", "graveyard", "rehearse"])
     ap.add_argument("--config", default="statuspages.json")
     ap.add_argument("--state", default="state")
     ap.add_argument("--only", help="run one service by name")
@@ -457,6 +499,9 @@ def main(argv=None):
     sites = json.loads(Path(args.config).read_text())
     if args.only:
         sites = [s for s in sites if s["name"].lower() == args.only.lower()]
+    if args.command == "rehearse":
+        print(f"{rehearse(sites)} rehearsal posts written, none posted")
+        return 0
     dry = args.dry_run or not os.environ.get("BLUESKY_APP_PASSWORD")
     if dry and not args.dry_run:
         print("BLUESKY_APP_PASSWORD not set: dry run", file=sys.stderr)

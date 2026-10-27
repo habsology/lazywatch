@@ -181,6 +181,25 @@ class Haunting(unittest.TestCase):
         self.assertIn("Still haunted: GitHub, Google Cloud, Slack", out)
 
 
+class Rehearsal(unittest.TestCase):
+    def test_rehearse_uses_history_and_posts_nothing(self):
+        history = {"incidents": [dict(STATUSPAGE["incidents"][1], status="resolved", shortlink="https://stspg.io/old1",
+                                      incident_updates=[{"body": "This incident has been resolved.", "created_at": "2026-10-20T10:00:00Z"}],
+                                      created_at="2026-10-20T09:00:00Z")]}
+        urls = []
+
+        def fetch(site):
+            urls.append(site["url"])
+            return history if site["url"].endswith("incidents.json") else {"incidents": []}
+        lines = []
+        n = g.rehearse([GITHUB, SLACK, GOOGLE], ask=lambda i, f: dict(POEM, quote="This incident has been resolved."),
+                       fetch=fetch, out=lines.append)
+        self.assertEqual(n, 1)                                                  # only Statuspage feeds have a history file
+        self.assertEqual(urls, ["https://www.githubstatus.com/api/v2/incidents.json"])
+        self.assertIn("quote verified", lines[0])
+        self.assertIn("“This incident has been resolved.”", lines[1])
+
+
 class Bluesky(unittest.TestCase):
     def test_link_card(self):
         inc = g.open_incidents(GITHUB, STATUSPAGE)[0]

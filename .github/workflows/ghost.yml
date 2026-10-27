@@ -7,10 +7,11 @@ on:
     - cron: "7 * * * *"
   workflow_dispatch:
     inputs:
-      dry_run:
-        description: "Write the verse, post nothing"
-        type: boolean
-        default: false
+      mode:
+        description: "post: the real thing. dry-run: write the verse, post nothing. rehearse: verse for each service's last incident, posted nowhere."
+        type: choice
+        options: [post, dry-run, rehearse]
+        default: post
 
 permissions:
   contents: read
@@ -72,7 +73,7 @@ jobs:
 
       - name: Haunt
         env:
-          DRY_RUN: ${{ inputs.dry_run }}
+          MODE: ${{ inputs.mode }}
           BLUESKY_HANDLE: ${{ secrets.BLUESKY_HANDLE }}
           BLUESKY_APP_PASSWORD: ${{ secrets.BLUESKY_APP_PASSWORD }}
           BROWSERBASE_API_KEY: ${{ secrets.BROWSERBASE_API_KEY }}
@@ -80,9 +81,11 @@ jobs:
           TIGER_DATABASE_URL: ${{ secrets.TIGER_DATABASE_URL }}
         run: |
           mkdir -p state/ghost
-          ARGS=""
-          if [ "$DRY_RUN" = "true" ]; then ARGS="--dry-run"; fi
-          python lazywatch_ghost.py $ARGS
+          case "$MODE" in
+            rehearse) python lazywatch_ghost.py rehearse ;;
+            dry-run)  python lazywatch_ghost.py --dry-run ;;
+            *)        python lazywatch_ghost.py ;;
+          esac
           python lazywatch_ghost.py graveyard
 
       - name: Save the ghost's memory
