@@ -95,6 +95,21 @@ class Verse(unittest.TestCase):
         self.assertEqual(b[facet["index"]["byteStart"]:facet["index"]["byteEnd"]].decode(), "www.githubstatus.com")  # byte offsets past the emoji
         self.assertEqual(posts[0]["images"][0]["alt"], "card: x")
 
+    def test_eight_lines_split_evenly_not_five_and_three(self):
+        poem = "\n".join(f"Line {n} of a hymn that runs long tonight" for n in range(1, 9))
+        posts = g.haunting_thread(self.inc, "hymn", poem, POEM["quote"])
+        self.assertEqual(len(posts), 2)
+        self.assertEqual(posts[0]["text"].count("Line "), 4)
+        self.assertEqual(posts[1]["text"].count("Line "), 4)
+
+    def test_news_and_people_are_never_quoted(self):
+        self.assertTrue(g.newsy("Investigators are examining whether Mr. Gaetz violated federal laws, the people said."))
+        self.assertFalse(g.newsy("Get a free web site with easy-to-use site building tools"))
+        self.assertTrue(g.about_the_site("Yahoo! GeoCities: Get a free web site with easy-to-use site building tools", "GeoCities"))
+        self.assertFalse(g.about_the_site("Senate panel to question Jane Doe on Tuesday", "Yahoo! Answers"))
+        self.assertFalse(g.about_the_site("A new album from Taylor Swift", "Yahoo! Answers"))
+        self.assertTrue(g.about_the_site("Yahoo Answers is the best place to ask questions", "Yahoo! Answers"))
+
     def test_long_verse_threads_into_replies(self):
         posts = g.haunting_thread(self.inc, "epic", g.clean_poem(LONG), LONG["quote"], [FAKE_CARD({"headline": "x"})])
         self.assertGreater(len(posts), 1)
@@ -269,6 +284,13 @@ class Throwback(unittest.TestCase):
         self.assertIn("url=http%3A%2F%2Fwww.geocities.com%2F&timestamp=20090601", calls[0])
         self.assertEqual(len(paragraphs), 1)
         self.assertEqual(seen, "Last seen December 2, 2007")
+
+    def test_newsy_quote_falls_back_to_the_name(self):
+        bad = {"poem": "Neighbourhoods of text,\nwe never knew what came next.", "quote": "Investigators said Mr. Doe was charged."}
+        lookup = lambda site: ("https://web.archive.org/web/1/x", ["Investigators said Mr. Doe was charged.", "Get a free home page today"], "")
+        g.throwback(self.SITES[:1], self.tmp, ask=lambda p: bad, poster=self.poster, lookup=lookup, cards=FAKE_CARD, now=NOW)
+        self.assertIn("“GeoCities”", self.threads[0][-1]["text"])
+        self.assertFalse(g.posts(self.tmp)[0]["verified"])
 
     def test_three_graves_then_the_next_three(self):
         n = g.throwback(self.SITES, self.tmp, ask=lambda prompt: self.ELEGY, poster=self.poster, lookup=self.lookup,

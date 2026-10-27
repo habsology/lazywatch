@@ -6,6 +6,7 @@ an amber candle for Throwback Thursday. Fonts are bundled under fonts/ (SIL Open
 
     python ghost_card.py sample.json out.jpg     # render one card from a spec file
 """
+import base64
 import html
 import json
 import sys
@@ -22,15 +23,21 @@ def _e(text):
     return html.escape(str(text or ""), quote=False)
 
 
+def _font(name):
+    """The font file inlined: a page built from a string has no origin, so file:// fonts would not load."""
+    data = base64.b64encode((FONTS / name).read_bytes()).decode()
+    return f"url(data:font/ttf;base64,{data})"
+
+
 def page_html(spec):
     kind = spec.get("kind", "haunting")
     ink = INK.get(kind, INK["haunting"])
     poem = _e(spec.get("poem", "")).replace("\n", "<br>")
     quote = _e(spec.get("quote", ""))
     return f"""<!doctype html><meta charset="utf-8"><style>
-@font-face{{font-family:SG;src:url(file://{FONTS}/SpaceGrotesk-700.ttf);font-weight:700}}
-@font-face{{font-family:SG;src:url(file://{FONTS}/SpaceGrotesk-500.ttf);font-weight:500}}
-@font-face{{font-family:IS;src:url(file://{FONTS}/InstrumentSerif-400.ttf);font-weight:400}}
+@font-face{{font-family:SG;src:{_font('SpaceGrotesk-700.ttf')};font-weight:700}}
+@font-face{{font-family:SG;src:{_font('SpaceGrotesk-500.ttf')};font-weight:500}}
+@font-face{{font-family:IS;src:{_font('InstrumentSerif-400.ttf')};font-weight:400}}
 *{{margin:0;box-sizing:border-box}} html,body{{width:{SIZE}px;height:{SIZE}px;overflow:hidden}}
 body{{background:#12102A;color:#F5F7FF;font-family:SG;position:relative}}
 .sky{{position:absolute;inset:0;background:
@@ -89,7 +96,7 @@ def render(spec, out=None):
         try:
             page = browser.new_page(viewport={"width": SIZE, "height": SIZE})
             page.set_content(page_html(spec))
-            page.wait_for_timeout(150)
+            page.evaluate("document.fonts.ready.then(() => true)")
             page.evaluate(FIT_JS)
             page.wait_for_timeout(50)
             data = page.screenshot(type="jpeg", quality=88)

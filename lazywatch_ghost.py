@@ -64,6 +64,12 @@ LENGTH = {f: n for f, _, n in FORMS}
 # A poem that trips this is thrown away; the model gets another go next hour.
 MEAN = re.compile(r"\b(idiots?|stupid|incompetent|useless|pathetic|garbage|trash|sucks?|worst|fired?|lazy|dumb|"
                   r"clowns?|amateurs?|shame on|blame)\b", re.I)
+# The ghost sings about products, never people and never the news. An archived home page can carry a news
+# ticker; a line that trips this is never quoted and never shown to the model.
+NEWSY = re.compile(r"\b(Mr|Mrs|Ms|Dr|Sen|Rep|Gov|Pres)\.|\b(said|says|police|investigat\w*|charged|arrest\w*|lawsuit|"
+                   r"trafficking|killed|dead|dies|died|death|shot|shooting|court|trial|crime|murder|war|attack\w*|"
+                   r"hospital|senator|president|minister|governor|mayor|election|campaign|abuse|assault|victim\w*|"
+                   r"indict\w*|allegation\w*|scandal|protest\w*|troops|military|terror\w*)\b", re.I)
 
 
 # ---------------------------------------------------------------- the feeds
@@ -204,6 +210,27 @@ def too_mean(poem):
     return bool(MEAN.search(poem))
 
 
+def newsy(text):
+    return bool(NEWSY.search(text))
+
+
+def site_words(site_name):
+    return {w.casefold() for w in re.findall(r"[A-Za-z]+", site_name)}
+
+
+def about_the_site(paragraph, site_name):
+    """Keep a paragraph from an archived home page only if it reads like the site talking about itself:
+    nothing newsy, and no capitalised pair of words that could be a person's name (the site's own name is fine)."""
+    if newsy(paragraph):
+        return False
+    ok = site_words(site_name) | {"home", "page", "web", "site", "sign", "log", "free", "new", "search", "help",
+                                  "terms", "privacy", "all", "rights", "reserved", "yahoo", "google", "the", "my"}
+    for a, b in re.findall(r"\b([A-Z][a-z]+) ([A-Z][a-z]+)\b", paragraph):
+        if a.casefold() not in ok and b.casefold() not in ok:
+            return False
+    return True
+
+
 def _length(text):
     return len(unicodedata.normalize("NFC", text))
 
@@ -266,52 +293,46 @@ def _post(text, link=None, images=None):
 
 
 def thread(header, lines, quote, link, images=None):
-    """Split header, verse, quote and source link over as few posts as possible, each under the limit.
-    The first post always carries the source link and the images; the quote comes last."""
+    """Split header, verse, quote and source link over as few posts as possible, each under the limit, the
+    lines shared out evenly between the posts. The first post always carries the source link and the images;
+    the quote comes last."""
     display, _url = link
     source = f"Source: {display}"
-    posts, chunk = [], []
-    pending = list(lines)
-    first = True
 
-    def body(chunk, with_header, with_source, with_quote):
+    def body(chunk, with_header, with_quote):
         parts = ([header] if with_header else []) + (["\n".join(chunk)] if chunk else [])
         if with_quote:
-            parts.append(f"“{quote}”")
-        if with_source:
+            parts.append(f"\u201c{quote}\u201d")
+        if with_header:
             parts.append(source)
         return "\n\n".join(parts)
 
-    while pending:
-        line = pending[0]
-        trial = chunk + [line]
-        if _length(body(trial, first, first, False)) <= POST_LIMIT:
-            chunk = trial
-            pending.pop(0)
-            continue
-        if not chunk:                                   # one line longer than a post: cut it, keep going
-            chunk = [_shorten(line, POST_LIMIT - _length(body([], first, first, False)) - 4)]
-            pending.pop(0)
-        posts.append((chunk, first))
-        chunk, first = [], False
-    # the quote: on the last chunk if it fits, else on a post of its own
-    if _length(body(chunk, first, first, True)) <= POST_LIMIT:
-        posts.append((chunk, first, True))
+    def fits(text):
+        return _length(text) <= POST_LIMIT
+
+    lines = [_shorten(l, POST_LIMIT - _length(body([], True, False)) - 4) for l in lines]
+    plan = None
+    for n in range(1, max(len(lines), 1) + 1):            # the fewest posts whose even share of lines fits
+        base, extra = divmod(len(lines), n)
+        sizes = [base + (1 if i >= n - extra else 0) for i in range(n)]   # the first post, with the header, gets the smaller share
+        chunks, at = [], 0
+        for size in sizes:
+            chunks.append(lines[at:at + size])
+            at += size
+        if all(fits(body(c, i == 0, False)) for i, c in enumerate(chunks)):
+            plan = chunks
+            break
+    plan = plan or [lines]
+    if fits(body(plan[-1], len(plan) == 1, True)):
+        texts = [body(c, i == 0, i == len(plan) - 1) for i, c in enumerate(plan)]
     else:
-        posts.append((chunk, first, False))
-        posts.append(([], False, True))
-    out = []
-    for n, item in enumerate(posts):
-        chunk, with_header = item[0], item[1]
-        with_quote = len(item) > 2 and item[2]
-        text = body(chunk, with_header, with_header, with_quote)
-        if with_quote and _length(text) > POST_LIMIT:   # a very long quote: a shorter prefix is still verbatim
-            room = POST_LIMIT - _length(body(chunk, with_header, with_header, False)) - 6
-            text = body(chunk, with_header, with_header, False) + f"\n\n“{_shorten(quote, max(room, 12))}”"
-        if not text.strip():
-            continue
-        out.append(_post(text, link if with_header else None, images if with_header else None))
-    return out
+        texts = [body(c, i == 0, False) for i, c in enumerate(plan)]
+        room = POST_LIMIT - 2
+        texts.append(f"\u201c{_shorten(quote, room)}\u201d")
+    if not fits(texts[-1]):                               # a long quote on a single post: a shorter prefix is still verbatim
+        room = POST_LIMIT - _length(texts[-1]) + _length(quote)
+        texts[-1] = texts[-1].replace(f"\u201c{quote}\u201d", f"\u201c{_shorten(quote, max(room, 12))}\u201d")
+    return [_post(t, link if i == 0 else None, images if i == 0 else None) for i, t in enumerate(texts) if t.strip()]
 
 
 def haunting_thread(incident, form, poem, quote, images=None):
@@ -546,10 +567,12 @@ def haunt(sites, state, ask=ask_ghost, poster=None, fetch=fetch_feed, shooter=sc
                 print(f"{name}: model unavailable ({exc.__class__.__name__})", file=sys.stderr)
                 continue
             poem = clean_poem(reply)
-            if not poem or too_mean(poem):
+            if not poem or too_mean(poem) or newsy(poem):
                 print(f"{name}: poem rejected ({'empty' if not poem else 'tone'}), will retry", file=sys.stderr)
                 continue
             quote, verified = verify_quote(reply, inc["update"], inc["title"])
+            if newsy(quote):
+                quote, verified = inc["title"], False
             images = []
             card = cards(card_spec("haunting", inc, entry["form"], poem, quote), out_dir, _slug(ident)) if cards else None
             if card:
@@ -597,7 +620,7 @@ def wayback(site, fetch_json=None, fetch_html=None):
     paragraphs = lazywatch.paragraphs(fetch_html(raw))
     stamp = closest.get("timestamp", "")
     seen = f"Last seen {datetime.strptime(stamp[:8], '%Y%m%d').strftime('%B %-d, %Y')}" if len(stamp) >= 8 else ""
-    return url, [p for p in paragraphs if len(p) >= 30][:40], seen
+    return url, [p for p in paragraphs if len(p) >= 30 and about_the_site(p, site["name"])][:40], seen
 
 
 def throwback_prompt(site, paragraphs):
@@ -639,10 +662,12 @@ def throwback(sites, state, ask=ask_model, poster=None, lookup=wayback, cards=re
             print(f"{site['name']}: model unavailable ({exc.__class__.__name__})", file=sys.stderr)
             break
         poem = clean_poem(reply)
-        if not poem or too_mean(poem):
+        if not poem or too_mean(poem) or newsy(poem):
             print(f"{site['name']}: elegy rejected", file=sys.stderr)
             continue
         quote, verified = verify_quote(reply, " ".join(paragraphs), site["name"])
+        if newsy(quote):
+            quote, verified = site["name"], False
         spec = card_spec("throwback", poem=poem, quote=quote, site=dict(site, seen=seen))
         card = cards(spec, out_dir, f"throwback-{_slug(site['name'])}") if cards else None
         header = f"\U0001F56F️ Throwback Thursday: in memoriam {site['name']} ({site['born']} to {site['died']})"
