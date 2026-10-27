@@ -91,8 +91,8 @@ def _latest(items, body_key, date_key):
 
 def _incident(site, ident, title, impact, status, url, update, since, affected):
     return {"service": site["name"], "id": f"{site['name']}:{ident}", "title": _text(title), "impact": str(impact or ""),
-            "status": str(status or ""), "url": url or site["page"], "update": _text(update), "since": str(since or ""),
-            "affected": [_text(a) for a in affected if a]}
+            "status": str(status or ""), "url": url or site["page"], "page": site["page"], "update": _text(update),
+            "since": str(since or ""), "affected": [_text(a) for a in affected if a]}
 
 
 def _statuspage(site, data):
@@ -320,7 +320,7 @@ def haunting_thread(incident, form, poem, quote, images=None):
     if since:
         header += f", down since {since}"
     lines = [l for l in poem.splitlines() if l.strip()]
-    return thread(header, lines, quote, (_host(incident["url"]), incident["url"]), images)
+    return thread(header, lines, quote, (_host(incident.get("page") or incident["url"]), incident["url"]), images)
 
 
 def resurrection_thread(service, entry, now, images=None):
@@ -329,7 +329,7 @@ def resurrection_thread(service, entry, now, images=None):
     title = entry["title"]
     text = (f"\U0001F47B {service} has risen. “{title}” haunted the status page for {lasted}"
             + (f" (since {since})" if since else "") + ". Lights back on, candles out. \U0001F56F️")
-    link = (_host(entry["url"]), entry["url"])
+    link = (_host(entry.get("page") or entry["url"]), entry["url"])
     tail = f"\n\nSource: {link[0]}"
     if _length(text + tail) > POST_LIMIT:
         room = len(title) - (_length(text + tail) - POST_LIMIT)
@@ -344,13 +344,13 @@ def card_spec(kind, incident=None, form=None, poem="", quote="", entry=None, ser
         since = _when(incident["since"])
         return {"kind": kind, "tag": tag + (f" · down since {since}" if since else ""),
                 "headline": f"{HEADLINE[form]} {incident['service']}", "sub": incident["title"],
-                "poem": poem, "quote": quote, "source": f"Source: {_host(incident['url'])}"}
+                "poem": poem, "quote": quote, "source": f"Source: {_host(incident.get('page') or incident['url'])}"}
     if kind == "risen":
         lasted = _duration(entry.get("since") or entry["first_seen"], now)
         return {"kind": kind, "tag": f"The Uptime Ghost · {service} · risen {_when(now.isoformat())}",
                 "headline": f"{service} has risen", "sub": entry["title"],
                 "poem": f"Haunted the status page for {lasted}.\nLights back on, candles out.",
-                "quote": "", "source": f"Source: {_host(entry['url'])}"}
+                "quote": "", "source": f"Source: {_host(entry.get('page') or entry['url'])}"}
     return {"kind": "throwback", "tag": f"Throwback Thursday · from the Wayback Machine · {site['born']} to {site['died']}",
             "headline": f"In memoriam: {site['name']}", "sub": site.get("seen", ""),
             "poem": poem, "quote": quote, "source": "Source: web.archive.org"}
@@ -532,7 +532,7 @@ def haunt(sites, state, ask=ask_ghost, poster=None, fetch=fetch_feed, shooter=sc
 
         for ident, inc in current.items():                                     # new or still unwritten: the verse
             entry = entries.setdefault(ident, {"title": inc["title"], "since": inc["since"], "url": inc["url"],
-                                               "first_seen": now.isoformat(), "form": pick_form(ident),
+                                               "page": inc["page"], "first_seen": now.isoformat(), "form": pick_form(ident),
                                                "attempts": 0, "posted": None})
             if entry.get("posted") or entry["attempts"] >= MAX_ATTEMPTS:
                 continue

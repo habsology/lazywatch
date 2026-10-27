@@ -112,7 +112,7 @@ def alt_text(spec):
     if spec.get("quote"):
         parts.append(f"Quote: “{spec['quote']}”.")
     if spec.get("source"):
-        parts.append(f"Source: {spec['source']}.")
+        parts.append(str(spec["source"]).rstrip(".") + ".")
     return " ".join(parts)[:1990]
 
 

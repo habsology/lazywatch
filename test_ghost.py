@@ -87,12 +87,12 @@ class Verse(unittest.TestCase):
         text = posts[0]["text"]
         self.assertTrue(text.startswith("👻 An ode to GitHub, down since Oct 28, 2026, 14:02 UTC\n\n"))
         self.assertIn("“We have identified the cause and are working on a fix.”", text)
-        self.assertTrue(text.endswith("Source: stspg.io"))
+        self.assertTrue(text.endswith("Source: www.githubstatus.com"))
         self.assertLessEqual(len(text), 300)
         facet = posts[0]["facets"][0]
         self.assertEqual(facet["features"][0]["uri"], "https://stspg.io/abc1")
         b = text.encode("utf-8")
-        self.assertEqual(b[facet["index"]["byteStart"]:facet["index"]["byteEnd"]].decode(), "stspg.io")  # byte offsets past the emoji
+        self.assertEqual(b[facet["index"]["byteStart"]:facet["index"]["byteEnd"]].decode(), "www.githubstatus.com")  # byte offsets past the emoji
         self.assertEqual(posts[0]["images"][0]["alt"], "card: x")
 
     def test_long_verse_threads_into_replies(self):
@@ -100,7 +100,7 @@ class Verse(unittest.TestCase):
         self.assertGreater(len(posts), 1)
         for p in posts:
             self.assertLessEqual(len(p["text"]), 300)
-        self.assertIn("Source: stspg.io", posts[0]["text"])            # the link stays on the first post
+        self.assertIn("Source: www.githubstatus.com", posts[0]["text"])  # the link stays on the first post
         self.assertTrue(posts[0]["images"]); self.assertFalse(posts[1]["images"])
         self.assertIn("“We have identified", posts[-1]["text"])         # the quote closes the thread
         joined = "\n".join(p["text"] for p in posts)
@@ -120,10 +120,11 @@ class Verse(unittest.TestCase):
         self.assertIn(g.pick_form("GitHub:abc1"), g.HEADLINE)
 
     def test_resurrection(self):
-        entry = {"title": "Incident with Actions", "since": "2026-10-28T13:16:00Z", "url": "https://stspg.io/abc1", "first_seen": "x"}
+        entry = {"title": "Incident with Actions", "since": "2026-10-28T13:16:00Z", "url": "https://stspg.io/abc1",
+                 "page": "https://www.githubstatus.com", "first_seen": "x"}
         posts = g.resurrection_thread("GitHub", entry, NOW)
         self.assertEqual(posts[0]["text"], "👻 GitHub has risen. “Incident with Actions” haunted the status page for 2 h 14 min "
-                                           "(since Oct 28, 2026, 13:16 UTC). Lights back on, candles out. 🕯️\n\nSource: stspg.io")
+                                           "(since Oct 28, 2026, 13:16 UTC). Lights back on, candles out. 🕯️\n\nSource: www.githubstatus.com")
         self.assertEqual(posts[0]["facets"][0]["features"][0]["uri"], "https://stspg.io/abc1")
         long_entry = dict(entry, title="t" * 400)
         self.assertLessEqual(len(g.resurrection_thread("GitHub", long_entry, NOW)[0]["text"]), 300)
@@ -133,7 +134,7 @@ class Verse(unittest.TestCase):
         spec = g.card_spec("haunting", self.inc, "ode", "a\nb", "q")
         self.assertEqual(spec["headline"], "An ode to GitHub")
         self.assertEqual(spec["tag"], "The Uptime Ghost · GitHub · down since Oct 28, 2026, 14:02 UTC")
-        self.assertEqual(spec["source"], "Source: stspg.io")
+        self.assertEqual(spec["source"], "Source: www.githubstatus.com")
         risen = g.card_spec("risen", entry={"title": "t", "since": "2026-10-28T13:16:00Z", "url": "https://x.y/z", "first_seen": "x"},
                             service="GitHub", now=NOW)
         self.assertEqual(risen["headline"], "GitHub has risen")
