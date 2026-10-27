@@ -49,7 +49,7 @@ jobs:
         run: |
           if [ ! -x "$HOME/ollama/bin/ollama" ]; then
             mkdir -p "$HOME/ollama"
-            curl -fsSL https://ollama.com/download/ollama-linux-amd64.tgz | tar -C "$HOME/ollama" -xz
+            curl -fsSL https://ollama.com/download/ollama-linux-amd64.tar.zst | zstd -d | tar -xf - -C "$HOME/ollama"
           fi
           echo "$HOME/ollama/bin" >> "$GITHUB_PATH"
 
@@ -79,6 +79,7 @@ jobs:
           BROWSERBASE_PROJECT_ID: ${{ secrets.BROWSERBASE_PROJECT_ID }}
           TIGER_DATABASE_URL: ${{ secrets.TIGER_DATABASE_URL }}
         run: |
+          mkdir -p state/ghost
           ARGS=""
           if [ "$DRY_RUN" = "true" ]; then ARGS="--dry-run"; fi
           python lazywatch_ghost.py $ARGS
