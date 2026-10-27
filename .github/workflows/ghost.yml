@@ -60,8 +60,10 @@ jobs:
         run: |
           nohup ollama serve > /tmp/ollama.log 2>&1 &
           for i in $(seq 1 30); do curl -fs http://localhost:11434/ > /dev/null && break; sleep 1; done
-          ollama pull gemma3:4b
-          if [ -n "$TIGER_DATABASE_URL" ]; then ollama pull embeddinggemma; fi
+          # progress bars are thousands of log lines; keep the last one
+          ollama pull gemma3:4b 2>&1 | tr '\r' '\n' | tail -n 1
+          if [ -n "$TIGER_DATABASE_URL" ]; then ollama pull embeddinggemma 2>&1 | tr '\r' '\n' | tail -n 1; fi
+          ollama list
 
       - name: Optional extras (Tiger Data memory, Browserbase screenshots)
         env:
