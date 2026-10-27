@@ -4,7 +4,7 @@ name: Uptime Ghost
 # State (which incidents the ghost has already sung about) travels between runs in the Actions cache.
 on:
   schedule:
-    - cron: "7 * * * *"      # every hour: the status feeds
+    - cron: "17,47 * * * *"  # twice an hour: the status feeds (GitHub drops scheduled runs near the top of the hour under load)
     - cron: "33 14 * * 4"    # Thursday 14:33 UTC (10:33 am Montreal): Throwback Thursday, three graves
   workflow_dispatch:
     inputs:
