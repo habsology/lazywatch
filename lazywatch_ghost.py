@@ -560,8 +560,9 @@ def haunt(sites, state, ask=ask_ghost, poster=None, fetch=fetch_feed, shooter=sc
     With dry_run nothing is posted and nothing is written; the posts are printed instead. Before any post,
     seen_live(key) checks the account's own feed so the same incident is never posted twice."""
     now = now or datetime.now(timezone.utc)
+    live = poster is None and not dry_run          # posting to the real account: read its feed first
     poster = poster or (print_poster if dry_run else BlueskyPoster())
-    seen_live = seen_live or ((lambda key: False) if dry_run else LiveFeedCheck())
+    seen_live = seen_live or (LiveFeedCheck() if live else (lambda key: False))
     seen = load_state(state)
     budget = MAX_POSTS_PER_DAY - posted_today(state, now)
     report = {"checked": 0, "failed": [], "open": 0, "posted": 0, "skipped": 0}
@@ -708,8 +709,9 @@ def throwback(sites, state, ask=ask_model, poster=None, lookup=wayback, cards=re
               count=3, out_dir=None, seen_live=None):
     """Three graves a Thursday: the next unvisited sites in throwback.json, each with an elegy from its last words."""
     now = now or datetime.now(timezone.utc)
+    live = poster is None and not dry_run          # posting to the real account: read its feed first
     poster = poster or (print_poster if dry_run else BlueskyPoster())
-    seen_live = seen_live or ((lambda key: False) if dry_run else LiveFeedCheck())
+    seen_live = seen_live or (LiveFeedCheck() if live else (lambda key: False))
     done = load_state(state, "throwback.json", [])
     budget = MAX_POSTS_PER_DAY - posted_today(state, now)
     visited = 0
