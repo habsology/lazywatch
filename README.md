@@ -126,12 +126,26 @@ The first line is the effort line: `N page checks in 7 days, model woken M times
 
 Some rules pages render their text in the browser, so a plain fetch sees almost nothing. Mark those `"render": true` in `sites.json` and lazywatch opens them in a real browser on Browserbase. `"render": "auto"` tries the plain download first and switches to the browser only if the page refuses it (a 404 is not a refusal: a dead page stays dead instead of snapshotting the error page); the choice is remembered so later checks compare like with like. If a page's fetch path ever changes, its first snapshot on the new path replaces the old one and no change is reported, because a plain fetch and a browser see different text.
 
+## The Uptime Ghost (status pages, verse, Bluesky)
+
+The same watcher pointed at something that changes every day: the official status pages of 18 services (`statuspages.json`: GitHub, Cloudflare, Discord, Slack, OpenAI, Claude, Google Cloud, Bluesky itself...). Every hour `lazywatch_ghost.py` reads each feed. A new incident wakes Gemma 3 4B, which writes a short ode, ballad, hymn, limerick, sea shanty, eulogy, lullaby or toast (the form is drawn per incident) that pokes gentle fun at the outage. The post goes to Bluesky with one sentence quoted word for word from the status page; the quote is checked against the page text and the incident's own title stands in when the model paraphrased. When the incident clears, a short resurrection notice follows.
+
+```
+python lazywatch_ghost.py --dry-run     # read the feeds, write the verse, post nothing
+python lazywatch_ghost.py               # post: needs BLUESKY_HANDLE and BLUESKY_APP_PASSWORD
+python lazywatch_ghost.py graveyard     # the tally so far
+```
+
+House rules, in code rather than left to the model: playful, never mean (a poem that insults anyone is thrown out and retried an hour later); companies and products only, never people; scheduled maintenance is ignored; at most 12 posts a day; the ghost never replies, follows or messages anyone, because there is no code for it. `BROWSERBASE_API_KEY` puts a screenshot of the status page on each post's link card, `TIGER_DATABASE_URL` keeps every haunting in the same Postgres memory as the rules watcher, and both are optional.
+
+`.github/workflows/ghost.yml` runs it hourly on a free GitHub Actions runner: Ollama and the model are installed user-local and cached, the ghost's memory of open incidents travels between runs in the Actions cache, and without the Bluesky secrets the run is a dry run that prints what it would have posted. Fork the repo, add the secrets, enable the workflow.
+
 ## Limits
 
 - It compares page text. A page that renders its rules with JavaScript looks empty to the plain fetch; mark it `"render": true` so it goes through the real browser. `python lazywatch.py peek` shows what each snapshot holds, so you can tell a real page from a "please enable JavaScript" shell.
 - Atom and RSS feeds work as pages: each entry's title and summary become one paragraph each. Feeds must stay on the plain fetch (no `render` key), since a browser would show its XML viewer instead.
 - A 4B model can misread a change. The verbatim-quote check catches invented text, not a wrong interpretation, so read the quote.
-- Be polite: one fetch per page per day, and respect each site's terms.
+- Be polite: one fetch per page per day, and respect each site's terms. The status feeds are public JSON APIs meant for this; one read per hour.
 
 ## Gemma terms of use
 

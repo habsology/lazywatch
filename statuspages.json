@@ -1,0 +1,20 @@
+[
+  {"name": "GitHub", "url": "https://www.githubstatus.com/api/v2/summary.json", "page": "https://www.githubstatus.com"},
+  {"name": "Cloudflare", "url": "https://www.cloudflarestatus.com/api/v2/summary.json", "page": "https://www.cloudflarestatus.com"},
+  {"name": "Discord", "url": "https://discordstatus.com/api/v2/summary.json", "page": "https://discordstatus.com"},
+  {"name": "Slack", "url": "https://slack-status.com/api/v2.0.0/current", "page": "https://slack-status.com", "format": "slack"},
+  {"name": "OpenAI", "url": "https://status.openai.com/api/v2/summary.json", "page": "https://status.openai.com"},
+  {"name": "Claude", "url": "https://status.claude.com/api/v2/summary.json", "page": "https://status.claude.com"},
+  {"name": "Reddit", "url": "https://www.redditstatus.com/api/v2/summary.json", "page": "https://www.redditstatus.com"},
+  {"name": "Zoom", "url": "https://www.zoomstatus.com/api/v2/summary.json", "page": "https://www.zoomstatus.com"},
+  {"name": "Twitch", "url": "https://status.twitch.com/api/v2/summary.json", "page": "https://status.twitch.com"},
+  {"name": "Vercel", "url": "https://www.vercel-status.com/api/v2/summary.json", "page": "https://www.vercel-status.com"},
+  {"name": "Dropbox", "url": "https://status.dropbox.com/api/v2/summary.json", "page": "https://status.dropbox.com"},
+  {"name": "Shopify", "url": "https://www.shopifystatus.com/api/v2/summary.json", "page": "https://www.shopifystatus.com"},
+  {"name": "Epic Games", "url": "https://status.epicgames.com/api/v2/summary.json", "page": "https://status.epicgames.com"},
+  {"name": "Google Cloud", "url": "https://status.cloud.google.com/incidents.json", "page": "https://status.cloud.google.com", "format": "google"},
+  {"name": "DigitalOcean", "url": "https://status.digitalocean.com/api/v2/summary.json", "page": "https://status.digitalocean.com"},
+  {"name": "Render", "url": "https://status.render.com/api/v2/summary.json", "page": "https://status.render.com"},
+  {"name": "Atlassian", "url": "https://status.atlassian.com/api/v2/summary.json", "page": "https://status.atlassian.com"},
+  {"name": "Bluesky", "url": "https://status.bsky.app/api/v2/summary.json", "page": "https://status.bsky.app"}
+]

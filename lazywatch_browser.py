@@ -36,6 +36,22 @@ def fetch_rendered(url, settle_ms=3000):
             browser.close()
 
 
+def screenshot(url, settle_ms=3000, width=1200, height=800):
+    """A JPEG of the page as a reader sees it (the ghost's link-card thumbnail)."""
+    bb = Browserbase(api_key=os.environ["BROWSERBASE_API_KEY"])
+    session = bb.sessions.create(**_session_kwargs())
+    with sync_playwright() as p:
+        browser = p.chromium.connect_over_cdp(session.connect_url)
+        try:
+            page = browser.contexts[0].pages[0]
+            page.set_viewport_size({"width": width, "height": height})
+            page.goto(url, wait_until="domcontentloaded", timeout=45_000)
+            page.wait_for_timeout(settle_ms)
+            return page.screenshot(type="jpeg", quality=80)
+        finally:
+            browser.close()
+
+
 def _count(fetcher, url):
     try:
         return str(len(lazywatch.paragraphs(fetcher(url)))) + " paragraphs"

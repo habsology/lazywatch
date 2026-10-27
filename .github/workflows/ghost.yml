@@ -1,0 +1,92 @@
+name: Uptime Ghost
+# Every hour: read the status feeds in statuspages.json, write verse for new incidents, post to Bluesky.
+# Posts only when the BLUESKY_* secrets exist; without them the run is a dry run that prints what it would post.
+# State (which incidents the ghost has already sung about) travels between runs in the Actions cache.
+on:
+  schedule:
+    - cron: "7 * * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Write the verse, post nothing"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ghost
+  cancel-in-progress: false
+
+jobs:
+  haunt:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Restore the ghost's memory
+        uses: actions/cache/restore@v4
+        with:
+          path: state/ghost
+          key: ghost-state-${{ github.run_id }}
+          restore-keys: ghost-state-
+
+      - name: Cache Ollama and the models
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/ollama
+            ~/.ollama/models
+          key: ollama-gemma3-4b-embeddinggemma-v1
+
+      - name: Install Ollama (user-local, no sudo)
+        run: |
+          if [ ! -x "$HOME/ollama/bin/ollama" ]; then
+            mkdir -p "$HOME/ollama"
+            curl -fsSL https://ollama.com/download/ollama-linux-amd64.tgz | tar -C "$HOME/ollama" -xz
+          fi
+          echo "$HOME/ollama/bin" >> "$GITHUB_PATH"
+
+      - name: Start Ollama and pull the models
+        env:
+          TIGER_DATABASE_URL: ${{ secrets.TIGER_DATABASE_URL }}
+        run: |
+          nohup ollama serve > /tmp/ollama.log 2>&1 &
+          for i in $(seq 1 30); do curl -fs http://localhost:11434/ > /dev/null && break; sleep 1; done
+          ollama pull gemma3:4b
+          if [ -n "$TIGER_DATABASE_URL" ]; then ollama pull embeddinggemma; fi
+
+      - name: Optional extras (Tiger Data memory, Browserbase screenshots)
+        env:
+          TIGER_DATABASE_URL: ${{ secrets.TIGER_DATABASE_URL }}
+          BROWSERBASE_API_KEY: ${{ secrets.BROWSERBASE_API_KEY }}
+        run: |
+          if [ -n "$TIGER_DATABASE_URL" ]; then pip install -q "psycopg[binary]" pgvector; fi
+          if [ -n "$BROWSERBASE_API_KEY" ]; then pip install -q browserbase playwright; fi
+
+      - name: Haunt
+        env:
+          DRY_RUN: ${{ inputs.dry_run }}
+          BLUESKY_HANDLE: ${{ secrets.BLUESKY_HANDLE }}
+          BLUESKY_APP_PASSWORD: ${{ secrets.BLUESKY_APP_PASSWORD }}
+          BROWSERBASE_API_KEY: ${{ secrets.BROWSERBASE_API_KEY }}
+          BROWSERBASE_PROJECT_ID: ${{ secrets.BROWSERBASE_PROJECT_ID }}
+          TIGER_DATABASE_URL: ${{ secrets.TIGER_DATABASE_URL }}
+        run: |
+          ARGS=""
+          if [ "$DRY_RUN" = "true" ]; then ARGS="--dry-run"; fi
+          python lazywatch_ghost.py $ARGS
+          python lazywatch_ghost.py graveyard
+
+      - name: Save the ghost's memory
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: state/ghost
+          key: ghost-state-${{ github.run_id }}
