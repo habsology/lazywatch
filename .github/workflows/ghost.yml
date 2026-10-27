@@ -4,13 +4,14 @@ name: Uptime Ghost
 # State (which incidents the ghost has already sung about) travels between runs in the Actions cache.
 on:
   schedule:
-    - cron: "7 * * * *"
+    - cron: "7 * * * *"      # every hour: the status feeds
+    - cron: "33 14 * * 4"    # Thursday 14:33 UTC (10:33 am Montreal): Throwback Thursday, three graves
   workflow_dispatch:
     inputs:
       mode:
-        description: "post: the real thing. dry-run: write the verse, post nothing. rehearse: verse for each service's last incident, posted nowhere."
+        description: "post: the real thing. dry-run: write the verse, post nothing. rehearse: verse and cards for each service's last incident, posted nowhere. throwback / throwback-dry-run: the Thursday graves."
         type: choice
-        options: [post, dry-run, rehearse]
+        options: [post, dry-run, rehearse, throwback, throwback-dry-run]
         default: post
 
 permissions:
@@ -65,30 +66,57 @@ jobs:
           if [ -n "$TIGER_DATABASE_URL" ]; then ollama pull embeddinggemma 2>&1 | tr '\r' '\n' | tail -n 1; fi
           ollama list
 
+      - name: Playwright with Chromium (the image cards)
+        run: pip install -q playwright==1.64.1
+
+      - name: Cache Chromium
+        id: chromium
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-1.64.1
+
+      - name: Install Chromium
+        if: steps.chromium.outputs.cache-hit != 'true'
+        run: python -m playwright install chromium
+
       - name: Optional extras (Tiger Data memory, Browserbase screenshots)
         env:
           TIGER_DATABASE_URL: ${{ secrets.TIGER_DATABASE_URL }}
           BROWSERBASE_API_KEY: ${{ secrets.BROWSERBASE_API_KEY }}
         run: |
           if [ -n "$TIGER_DATABASE_URL" ]; then pip install -q "psycopg[binary]" pgvector; fi
-          if [ -n "$BROWSERBASE_API_KEY" ]; then pip install -q browserbase playwright; fi
+          if [ -n "$BROWSERBASE_API_KEY" ]; then pip install -q browserbase; fi
 
       - name: Haunt
         env:
           MODE: ${{ inputs.mode }}
+          SCHEDULE: ${{ github.event.schedule }}
           BLUESKY_HANDLE: ${{ secrets.BLUESKY_HANDLE }}
           BLUESKY_APP_PASSWORD: ${{ secrets.BLUESKY_APP_PASSWORD }}
           BROWSERBASE_API_KEY: ${{ secrets.BROWSERBASE_API_KEY }}
           BROWSERBASE_PROJECT_ID: ${{ secrets.BROWSERBASE_PROJECT_ID }}
           TIGER_DATABASE_URL: ${{ secrets.TIGER_DATABASE_URL }}
         run: |
-          mkdir -p state/ghost
+          mkdir -p state/ghost out
+          if [ "$SCHEDULE" = "33 14 * * 4" ]; then MODE=throwback; fi
           case "$MODE" in
-            rehearse) python lazywatch_ghost.py rehearse ;;
-            dry-run)  python lazywatch_ghost.py --dry-run ;;
-            *)        python lazywatch_ghost.py ;;
+            rehearse)          python lazywatch_ghost.py rehearse --out out ;;
+            dry-run)           python lazywatch_ghost.py --dry-run --out out ;;
+            throwback)         python lazywatch_ghost.py throwback --out out ;;
+            throwback-dry-run) python lazywatch_ghost.py throwback --dry-run --out out ;;
+            *)                 python lazywatch_ghost.py --out out ;;
           esac
           python lazywatch_ghost.py graveyard
+
+      - name: Keep the cards (14 days)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cards-${{ github.run_number }}
+          path: out
+          if-no-files-found: ignore
+          retention-days: 14
 
       - name: Save the ghost's memory
         if: always()

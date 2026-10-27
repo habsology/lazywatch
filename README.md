@@ -128,17 +128,21 @@ Some rules pages render their text in the browser, so a plain fetch sees almost 
 
 ## The Uptime Ghost (status pages, verse, Bluesky)
 
-The same watcher pointed at something that changes every day: the official status pages of 18 services (`statuspages.json`: GitHub, Cloudflare, Discord, Slack, OpenAI, Claude, Google Cloud, Bluesky itself...). Every hour `lazywatch_ghost.py` reads each feed. A new incident wakes Gemma 3 4B, which writes a short ode, ballad, hymn, limerick, sea shanty, eulogy, lullaby or toast (the form is drawn per incident) that pokes gentle fun at the outage. The post goes to Bluesky with one sentence quoted word for word from the status page; the quote is checked against the page text and the incident's own title stands in when the model paraphrased. When the incident clears, a short resurrection notice follows.
+The same watcher pointed at something that changes every day: the official status pages of 18 services (`statuspages.json`: GitHub, Cloudflare, Discord, Slack, OpenAI, Claude, Google Cloud, Bluesky itself...). Every hour `lazywatch_ghost.py` reads each feed. A new incident wakes Gemma 3 4B, which writes an ode, ballad, hymn, limerick, proclamation, haiku, sea shanty, eulogy, lullaby, toast, couplet or epic (the form is drawn per incident, so the length runs from 2 to 16 lines) that pokes gentle fun at the outage. The ghost posts it to Bluesky on an image card (`ghost_card.py`: 1080 px, HTML and CSS rendered with Chromium, the fonts bundled under `fonts/`), with the date and time the incident started, one sentence quoted word for word from the status page, and a link to the source. The quote is checked against the page text; when the model paraphrased, the incident's own title stands in. A poem longer than one post continues in replies to the ghost's own post, and the quote closes the thread. When the incident clears, a short resurrection notice follows with the time it haunted the page.
+
+On Thursdays the ghost visits three graves of the old web (`throwback.json`: GeoCities, Google Reader, Yahoo! Answers...). It asks the Wayback Machine for the closest saved copy of each home page, reads what the page used to say, and writes an elegy that quotes it word for word, with a link to the archived page.
 
 ```
-python lazywatch_ghost.py --dry-run     # read the feeds, write the verse, post nothing
-python lazywatch_ghost.py               # post: needs BLUESKY_HANDLE and BLUESKY_APP_PASSWORD
-python lazywatch_ghost.py graveyard     # the tally so far
+python lazywatch_ghost.py --dry-run              # read the feeds, write the verse, post nothing
+python lazywatch_ghost.py                        # post: needs BLUESKY_HANDLE and BLUESKY_APP_PASSWORD
+python lazywatch_ghost.py rehearse --out out     # verse and cards for each service's last incident, posted nowhere
+python lazywatch_ghost.py throwback --dry-run    # the Thursday graves
+python lazywatch_ghost.py graveyard              # the tally so far
 ```
 
-House rules, in code rather than left to the model: playful, never mean (a poem that insults anyone is thrown out and retried an hour later); companies and products only, never people; scheduled maintenance is ignored; at most 12 posts a day; the ghost never replies, follows or messages anyone, because there is no code for it. `BROWSERBASE_API_KEY` puts a screenshot of the status page on each post's link card, `TIGER_DATABASE_URL` keeps every haunting in the same Postgres memory as the rules watcher, and both are optional.
+House rules, in code rather than left to the model: playful, never mean (a poem that insults anyone is thrown out and retried an hour later); companies and products only, never people; scheduled maintenance is ignored; at most 12 posts a day; the ghost never replies to anyone else, never follows and never messages, because there is no code for it. The cards need `pip install playwright` and `python -m playwright install chromium`; without them the posts go out as text. `BROWSERBASE_API_KEY` adds a screenshot of the status page as a second image, `TIGER_DATABASE_URL` keeps every haunting in the same Postgres memory as the rules watcher, and both are optional.
 
-`.github/workflows/ghost.yml` runs it hourly on a free GitHub Actions runner: Ollama and the model are installed user-local and cached, the ghost's memory of open incidents travels between runs in the Actions cache, and without the Bluesky secrets the run is a dry run that prints what it would have posted. Fork the repo, add the secrets, enable the workflow.
+`.github/workflows/ghost.yml` runs it hourly on a free GitHub Actions runner, plus the Thursday visit: Ollama, the model and Chromium are installed user-local and cached, the ghost's memory of open incidents travels between runs in the Actions cache, each run keeps its cards as an artifact for two weeks, and without the Bluesky secrets the run is a dry run that prints what it would have posted. Fork the repo, add the secrets, enable the workflow.
 
 ## Limits
 
