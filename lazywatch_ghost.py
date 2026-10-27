@@ -161,11 +161,17 @@ def clean_poem(reply):
     return "\n".join(lines)
 
 
+def _plain(text):
+    """For the comparison only: straight quotes, one case, no trailing full stop. The words must still match exactly."""
+    text = text.replace("\u2019", "'").replace("\u2018", "'").replace("\u201c", '"').replace("\u201d", '"')
+    return _text(text).casefold().rstrip(".!")
+
+
 def verify_quote(reply, incident):
     """The quote must appear word for word on the status page; otherwise the incident's own title
     (also lifted straight from the page) stands in, and the post is marked unverified."""
-    quote = _text(reply.get("quote", "")).strip('"“”') if isinstance(reply, dict) else ""
-    if quote and (quote in incident["update"] or quote == incident["title"]):
+    quote = _text(reply.get("quote", "")).strip('"\u201c\u201d') if isinstance(reply, dict) else ""
+    if len(quote) >= 12 and (_plain(quote) in _plain(incident["update"]) or _plain(quote) == _plain(incident["title"])):
         return quote, True
     return incident["title"], False
 

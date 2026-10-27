@@ -71,6 +71,9 @@ class Verse(unittest.TestCase):
         made_up = {"quote": "Everything is on fire and the cause is unknown."}
         self.assertEqual(g.verify_quote(made_up, self.inc), ("Incident with Actions", False))
         self.assertEqual(g.verify_quote({"quote": "  “We have identified the cause and are working on a fix.” "}, self.inc)[1], True)
+        self.assertTrue(g.verify_quote({"quote": "we have identified the cause and are working on a fix"}, self.inc)[1])  # case and full stop
+        self.assertFalse(g.verify_quote({"quote": "the cause"}, self.inc)[1])                                        # too short to mean anything
+        self.assertFalse(g.verify_quote({"quote": "We have identified the cause and are working on the fix."}, self.inc)[1])  # one word off
 
     def test_post_fits_bluesky_and_quotes_the_page(self):
         text = g.compose(self.inc, "ode", g.clean_poem(POEM), POEM["quote"])
