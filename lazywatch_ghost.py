@@ -11,8 +11,9 @@ the Wayback Machine (throwback.json) and writes each an elegy from what the page
 
 House rules, enforced in code rather than left to the model: playful, never mean;
 companies and products only, never people; every post quotes its source verbatim;
-at most MAX_POSTS_PER_DAY posts a day; the ghost never replies to anyone else, never
-follows and never messages (there is simply no code for it).
+at most MAX_POSTS_PER_DAY posts a day; never the same incident twice (its memory of what it
+posted, and a check of its own live feed before every post); the ghost never pins, never
+replies to anyone else, never follows and never messages (there is simply no code for it).
 
     python lazywatch_ghost.py --dry-run          # read the feeds, write the verse, post nothing
     python lazywatch_ghost.py                    # post (needs BLUESKY_HANDLE and BLUESKY_APP_PASSWORD)
@@ -44,6 +45,7 @@ MAX_ATTEMPTS = 6            # hourly runs we keep trying to write a poem for one
 POST_LIMIT = 295            # Bluesky allows 300 graphemes; keep a margin for emoji
 MAX_LINES = 16
 BSKY = "https://bsky.social/xrpc"
+PUB = "https://public.api.bsky.app/xrpc"
 WAYBACK = "https://archive.org/wayback/available"
 ACTIVE = {"investigating", "identified", "monitoring"}
 # form, headline, and how long it usually runs (the model may bend it when it makes sense)
@@ -405,6 +407,55 @@ def screenshot(url, service):
         return None
 
 
+# ---------------------------------------------------------------- never the same post twice
+def fingerprint(text):
+    """Words only: no links, punctuation, emoji or case, so a post is recognised however it was wrapped."""
+    return " ".join(re.findall(r"[a-z0-9]+", str(text or "").casefold()))
+
+
+def live_feed(handle=None, limit=100):
+    """Fingerprints of the account's own recent posts, read without logging in: the repeat check that
+    holds even if the ghost's memory of what it posted is lost."""
+    handle = handle or os.environ["BLUESKY_HANDLE"]
+    q = urllib.parse.urlencode({"actor": handle, "limit": limit, "filter": "posts_no_replies"})
+    req = urllib.request.Request(f"{PUB}/app.bsky.feed.getAuthorFeed?{q}", headers=lazywatch.UA)
+    with urllib.request.urlopen(req, timeout=30) as r:
+        data = json.loads(r.read())
+    return [fingerprint(item["post"]["record"].get("text", "")) for item in data.get("feed", []) if "post" in item]
+
+
+class LiveFeedCheck:
+    """seen(key): is a post with these words already on the account's feed? The feed is read once per run.
+    If it cannot be read, every key counts as seen: a missed hour costs less than a double post."""
+    def __init__(self, handle=None):
+        self.handle = handle
+        self.feed = None
+
+    def __call__(self, key):
+        if self.feed is None:
+            try:
+                self.feed = live_feed(self.handle)
+            except Exception as exc:
+                print(f"live feed unreadable ({exc.__class__.__name__}): posting nothing this run", file=sys.stderr)
+                self.feed = False
+        if self.feed is False:
+            return True
+        fp = fingerprint(key)
+        return any(fp and fp in post for post in self.feed)
+
+
+def haunting_key(incident, form):
+    return f"{HEADLINE[form]} {incident['service']} down since {_when(incident['since'])}"
+
+
+def resurrection_key(service, entry):
+    return f"{service} has risen {entry['title']}"
+
+
+def throwback_key(site):
+    return f"in memoriam {site['name']}"
+
+
 # ---------------------------------------------------------------- Bluesky
 def _xrpc(nsid, body, jwt=None, content_type="application/json"):
     data = body if isinstance(body, bytes) else json.dumps(body).encode()
@@ -504,11 +555,13 @@ def posted_today(state, now):
 
 
 def haunt(sites, state, ask=ask_ghost, poster=None, fetch=fetch_feed, shooter=screenshot, cards=render_card,
-          now=None, dry_run=False, out_dir=None):
+          now=None, dry_run=False, out_dir=None, seen_live=None):
     """One pass over every status feed: new incidents get verse, cleared incidents get a resurrection notice.
-    With dry_run nothing is posted and nothing is written; the posts are printed instead."""
+    With dry_run nothing is posted and nothing is written; the posts are printed instead. Before any post,
+    seen_live(key) checks the account's own feed so the same incident is never posted twice."""
     now = now or datetime.now(timezone.utc)
     poster = poster or (print_poster if dry_run else BlueskyPoster())
+    seen_live = seen_live or ((lambda key: False) if dry_run else LiveFeedCheck())
     seen = load_state(state)
     budget = MAX_POSTS_PER_DAY - posted_today(state, now)
     report = {"checked": 0, "failed": [], "open": 0, "posted": 0, "skipped": 0}
@@ -537,6 +590,12 @@ def haunt(sites, state, ask=ask_ghost, poster=None, fetch=fetch_feed, shooter=sc
             if budget <= 0:
                 report["skipped"] += 1
                 continue
+            if seen_live(resurrection_key(name, entry)):
+                print(f"{name}: resurrection already on the feed, not posting again", file=sys.stderr)
+                if not dry_run:
+                    _log(state, {"when": now.isoformat(), "kind": "duplicate-skipped", "service": name, "id": ident,
+                                 "title": entry["title"], "key": resurrection_key(name, entry)})
+                continue
             card = cards(card_spec("risen", entry=entry, service=name, now=now), out_dir, f"risen-{_slug(ident)}") if cards else None
             posts_ = resurrection_thread(name, entry, now, [card] if card else None)
             try:
@@ -549,7 +608,8 @@ def haunt(sites, state, ask=ask_ghost, poster=None, fetch=fetch_feed, shooter=sc
             report["posted"] += 1
             if not dry_run:
                 _log(state, {"when": now.isoformat(), "kind": "resurrection", "service": name, "id": ident,
-                             "title": entry["title"], "text": posts_[0]["text"], "uri": uris[0]})
+                             "title": entry["title"], "key": resurrection_key(name, entry), "text": posts_[0]["text"],
+                             "uri": uris[0]})
 
         for ident, inc in current.items():                                     # new or still unwritten: the verse
             entry = entries.setdefault(ident, {"title": inc["title"], "since": inc["since"], "url": inc["url"],
@@ -559,6 +619,13 @@ def haunt(sites, state, ask=ask_ghost, poster=None, fetch=fetch_feed, shooter=sc
                 continue
             if budget <= 0:
                 report["skipped"] += 1
+                continue
+            if seen_live(haunting_key(inc, entry["form"])):           # the memory was lost, the feed was not
+                print(f"{name}: already on the feed, not posting again", file=sys.stderr)
+                entry["posted"] = {"when": now.isoformat(), "uri": "live-feed"}
+                if not dry_run:
+                    _log(state, {"when": now.isoformat(), "kind": "duplicate-skipped", "service": name, "id": ident,
+                                 "title": inc["title"], "key": haunting_key(inc, entry["form"])})
                 continue
             entry["attempts"] += 1
             try:
@@ -592,8 +659,8 @@ def haunt(sites, state, ask=ask_ghost, poster=None, fetch=fetch_feed, shooter=sc
             if not dry_run:
                 _log(state, {"when": now.isoformat(), "kind": "haunting", "service": name, "id": ident,
                              "form": entry["form"], "title": inc["title"], "quote": quote, "verified": verified,
-                             "lines": len(poem.splitlines()), "posts": len(posts_), "text": posts_[0]["text"],
-                             "uri": uris[0]})
+                             "lines": len(poem.splitlines()), "posts": len(posts_), "key": haunting_key(inc, entry["form"]),
+                             "text": posts_[0]["text"], "uri": uris[0]})
                 lazywatch._store("record_change", {"site": f"ghost:{name}", "url": inc["url"],
                                                    "summary": f"{entry['form']} for {name}: {inc['title']}",
                                                    "quote": quote, "verified": verified, "added": [poem, inc["update"]]})
@@ -638,16 +705,23 @@ def throwback_prompt(site, paragraphs):
 
 
 def throwback(sites, state, ask=ask_model, poster=None, lookup=wayback, cards=render_card, now=None, dry_run=False,
-              count=3, out_dir=None):
+              count=3, out_dir=None, seen_live=None):
     """Three graves a Thursday: the next unvisited sites in throwback.json, each with an elegy from its last words."""
     now = now or datetime.now(timezone.utc)
     poster = poster or (print_poster if dry_run else BlueskyPoster())
+    seen_live = seen_live or ((lambda key: False) if dry_run else LiveFeedCheck())
     done = load_state(state, "throwback.json", [])
     budget = MAX_POSTS_PER_DAY - posted_today(state, now)
     visited = 0
     for site in [s for s in sites if s["name"] not in done]:
         if visited >= count or budget <= 0:
             break
+        if seen_live(throwback_key(site)):                               # visited before, by a ghost that forgot
+            print(f"{site['name']}: already on the feed, grave marked as visited", file=sys.stderr)
+            if not dry_run:
+                done.append(site["name"])
+                save_state(state, done, "throwback.json")
+            continue
         try:
             url, paragraphs, seen = lookup(site)
         except Exception as exc:
@@ -685,7 +759,8 @@ def throwback(sites, state, ask=ask_model, poster=None, lookup=wayback, cards=re
             save_state(state, done, "throwback.json")
             _log(state, {"when": now.isoformat(), "kind": "throwback", "service": site["name"], "id": f"throwback:{site['name']}",
                          "form": "elegy", "title": site.get("note", ""), "quote": quote, "verified": verified,
-                         "lines": len(poem.splitlines()), "posts": len(posts_), "text": posts_[0]["text"], "uri": uris[0]})
+                         "lines": len(poem.splitlines()), "posts": len(posts_), "key": throwback_key(site),
+                         "text": posts_[0]["text"], "uri": uris[0]})
             lazywatch._store("record_change", {"site": f"ghost:throwback", "url": url, "summary": f"elegy for {site['name']}",
                                                "quote": quote, "verified": verified, "added": [poem] + paragraphs[:10]})
     return visited

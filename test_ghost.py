@@ -246,6 +246,42 @@ class Haunting(unittest.TestCase):
         self.assertIn("Still haunted: GitHub, Google Cloud, Slack", out)
 
 
+class NeverTwice(unittest.TestCase):
+    def test_fingerprint_is_words_only(self):
+        self.assertEqual(g.fingerprint("👻 An ode to GitHub, down since Oct 28, 2026, 14:02 UTC\n\nSource: www.githubstatus.com"),
+                         "an ode to github down since oct 28 2026 14 02 utc source www githubstatus com")
+        check = g.LiveFeedCheck(); check.feed = [g.fingerprint("👻 An ode to GitHub, down since Oct 28, 2026, 14:02 UTC\n\nverse")]
+        inc = g.open_incidents(GITHUB, STATUSPAGE)[0]
+        self.assertTrue(check(g.haunting_key(inc, "ode")))
+        self.assertFalse(check(g.haunting_key(inc, "hymn")))
+        self.assertFalse(check(g.haunting_key(dict(inc, since="2026-10-29T14:02:11.000Z"), "ode")))
+
+    def test_unreadable_feed_means_no_posting(self):
+        check = g.LiveFeedCheck(handle="nobody.invalid")
+        check.feed = False
+        self.assertTrue(check("anything"))
+
+    def test_haunting_already_on_feed_is_not_posted_again(self):
+        tmp = tempfile.mkdtemp(); threads = []
+        feeds = {"GitHub": STATUSPAGE, "Slack": {"active_incidents": []}, "Google Cloud": []}
+        r = g.haunt([GITHUB, SLACK, GOOGLE], tmp, ask=lambda i, f: POEM, poster=lambda posts: threads.append(posts) or ["at://x"],
+                    fetch=lambda s: feeds[s["name"]], shooter=None, cards=FAKE_CARD, now=NOW, seen_live=lambda key: True)
+        self.assertEqual((r["posted"], len(threads)), (0, 0))
+        self.assertEqual(g.load_state(tmp)["GitHub"]["GitHub:abc1"]["posted"]["uri"], "live-feed")
+        self.assertEqual(g.posts(tmp)[0]["kind"], "duplicate-skipped")
+        r = g.haunt([GITHUB, SLACK, GOOGLE], tmp, ask=lambda i, f: POEM, poster=lambda posts: threads.append(posts) or ["at://x"],
+                    fetch=lambda s: feeds[s["name"]], shooter=None, cards=FAKE_CARD, now=NOW, seen_live=lambda key: False)
+        self.assertEqual(r["posted"], 0)                                      # remembered as posted from then on
+
+    def test_grave_already_on_feed_is_marked_visited(self):
+        tmp = tempfile.mkdtemp(); threads = []
+        sites = Throwback.SITES[:1]
+        n = g.throwback(sites, tmp, ask=lambda p: Throwback.ELEGY, poster=lambda posts: threads.append(posts) or ["at://x"],
+                        lookup=lambda s: ("u", ["Get a free home page today"], ""), cards=FAKE_CARD, now=NOW, seen_live=lambda key: True)
+        self.assertEqual((n, len(threads)), (0, 0))
+        self.assertEqual(g.load_state(tmp, "throwback.json", []), ["GeoCities"])
+
+
 class Throwback(unittest.TestCase):
     SITES = [{"name": "GeoCities", "url": "http://www.geocities.com/", "when": "20090601", "born": 1994, "died": 2009, "note": "n"},
              {"name": "Vine", "url": "https://vine.co/", "when": "20160901", "born": 2013, "died": 2017, "note": "n"},
