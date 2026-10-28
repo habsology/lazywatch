@@ -390,7 +390,7 @@ class Throwback(unittest.TestCase):
         bad = {"poem": "Neighbourhoods of text,\nwe never knew what came next.", "quote": "Investigators said Mr. Doe was charged."}
         lookup = lambda site: ("https://web.archive.org/web/1/x", ["Investigators said Mr. Doe was charged.", "Get a free home page today"], "")
         g.throwback(self.SITES[:1], self.tmp, ask=lambda p: bad, poster=self.poster, lookup=lookup, cards=FAKE_CARD, now=NOW)
-        self.assertIn("“GeoCities”", self.threads[0][-1]["text"])
+        self.assertIn("“GeoCities”", self.threads[0][-2]["text"])
         self.assertFalse(g.posts(self.tmp)[0]["verified"])
 
     def test_three_graves_then_the_next_three(self):
@@ -408,6 +408,19 @@ class Throwback(unittest.TestCase):
         self.assertEqual(g.throwback(self.SITES, self.tmp, ask=lambda p: self.ELEGY, poster=self.poster, lookup=self.lookup,
                                      cards=FAKE_CARD, now=NOW), 0)          # every grave visited
         self.assertIn("3 graves visited", g.graveyard(self.tmp))
+
+    def test_the_old_home_page_closes_each_grave(self):
+        shots = []
+        shooter = lambda url, name: shots.append(url) or {"data": b"jpeg", "mime": "image/jpeg", "alt": "x"}
+        g.throwback(self.SITES, self.tmp, ask=lambda p: self.ELEGY, poster=self.poster, lookup=self.lookup,
+                    cards=FAKE_CARD, now=NOW, count=1, shooter=shooter)
+        last = self.threads[0][-1]
+        self.assertEqual(shots[0], "https://web.archive.org/web/20090601id_/http://www.geocities.com/")   # no Wayback toolbar
+        self.assertTrue(last["text"].startswith("GeoCities as it looked"))
+        self.assertTrue(last["text"].endswith("Source: web.archive.org"))
+        self.assertEqual(last["facets"][0]["features"][0]["uri"], "https://web.archive.org/web/20090601/http://www.geocities.com/")
+        self.assertEqual(len(last["images"]), 1)
+        self.assertIn("GeoCities home page", last["images"][0]["alt"])
 
     def test_dry_run_visits_but_remembers_nothing(self):
         n = g.throwback(self.SITES, self.tmp, ask=lambda p: self.ELEGY, poster=self.poster, lookup=self.lookup,
