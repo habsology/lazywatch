@@ -82,8 +82,8 @@ class Verse(unittest.TestCase):
         self.assertFalse(g.verify_quote({"quote": "We have identified the cause and are working on the fix."}, self.inc["update"], "t")[1])
 
     def test_first_post_has_date_source_link_and_card(self):
-        posts = g.haunting_thread(self.inc, "ode", g.clean_poem(POEM), POEM["quote"], [FAKE_CARD({"headline": "x"})])
-        self.assertEqual(len(posts), 1)
+        posts = g.haunting_thread(self.inc, "ode", g.clean_poem(POEM), POEM["quote"], [FAKE_CARD({"headline": "x"})], now=NOW)
+        self.assertEqual(len(posts), 2)                                   # the verse, then the status page
         text = posts[0]["text"]
         self.assertTrue(text.startswith("👻 An ode to GitHub, down since Oct 28, 2026, 14:02 UTC\n\n"))
         self.assertIn("“We have identified the cause and are working on a fix.”", text)
@@ -94,11 +94,26 @@ class Verse(unittest.TestCase):
         b = text.encode("utf-8")
         self.assertEqual(b[facet["index"]["byteStart"]:facet["index"]["byteEnd"]].decode(), "www.githubstatus.com")  # byte offsets past the emoji
         self.assertEqual(posts[0]["images"][0]["alt"], "card: x")
+        last = posts[-1]                                                  # written the way people search for an outage
+        self.assertEqual(last["text"], "Is GitHub down? Its status page has reported “Incident with Actions” since Oct 28, 2026, 14:02 UTC."
+                                       "\n\nStatus page checked Oct 28, 2026, 15:30 UTC.\n\nSource: www.githubstatus.com")
+        self.assertEqual(last["facets"][0]["features"][0]["uri"], "https://stspg.io/abc1")
+        self.assertEqual(last["images"], [])
+
+    def test_screenshot_closes_the_thread_on_its_own_post(self):
+        shot = {"data": b"jpeg", "mime": "image/jpeg", "alt": "Screenshot of the GitHub status page at Oct 28, 2026, 15:30 UTC."}
+        posts = g.haunting_thread(self.inc, "ode", g.clean_poem(POEM), POEM["quote"], [FAKE_CARD({"headline": "x"})], shot, NOW)
+        self.assertEqual([len(p["images"]) for p in posts], [1, 1])
+        self.assertEqual(posts[0]["images"][0]["alt"], "card: x")        # the card stays with the verse
+        self.assertEqual(posts[-1]["images"][0], shot)                   # the screenshot is the last post's only image
+        self.assertIn("Screenshot taken Oct 28, 2026, 15:30 UTC.", posts[-1]["text"])
+        long_inc = dict(self.inc, title="t" * 400)
+        self.assertLessEqual(len(g.status_post(long_inc, shot, NOW)["text"]), 300)
 
     def test_eight_lines_split_evenly_not_five_and_three(self):
         poem = "\n".join(f"Line {n} of a hymn that runs long tonight" for n in range(1, 9))
         posts = g.haunting_thread(self.inc, "hymn", poem, POEM["quote"])
-        self.assertEqual(len(posts), 2)
+        self.assertEqual(len(posts), 3)
         self.assertEqual(posts[0]["text"].count("Line "), 4)
         self.assertEqual(posts[1]["text"].count("Line "), 4)
 
@@ -117,7 +132,8 @@ class Verse(unittest.TestCase):
             self.assertLessEqual(len(p["text"]), 300)
         self.assertIn("Source: www.githubstatus.com", posts[0]["text"])  # the link stays on the first post
         self.assertTrue(posts[0]["images"]); self.assertFalse(posts[1]["images"])
-        self.assertIn("“We have identified", posts[-1]["text"])         # the quote closes the thread
+        self.assertIn("“We have identified", posts[-2]["text"])         # the quote closes the verse
+        self.assertTrue(posts[-1]["text"].startswith("Is GitHub down?"))  # the status page closes the thread
         joined = "\n".join(p["text"] for p in posts)
         for n in range(1, 15):
             self.assertIn(f"Verse {n}:", joined)                        # nothing dropped
@@ -138,8 +154,8 @@ class Verse(unittest.TestCase):
         entry = {"title": "Incident with Actions", "since": "2026-10-28T13:16:00Z", "url": "https://stspg.io/abc1",
                  "page": "https://www.githubstatus.com", "first_seen": "x"}
         posts = g.resurrection_thread("GitHub", entry, NOW)
-        self.assertEqual(posts[0]["text"], "👻 GitHub has risen. “Incident with Actions” haunted the status page for 2 h 14 min "
-                                           "(since Oct 28, 2026, 13:16 UTC). Lights back on, candles out. 🕯️\n\nSource: www.githubstatus.com")
+        self.assertEqual(posts[0]["text"], "👻 GitHub has risen, back up after 2 h 14 min. “Incident with Actions” haunted the status page "
+                                           "since Oct 28, 2026, 13:16 UTC. Lights back on, candles out. 🕯️\n\nSource: www.githubstatus.com")
         self.assertEqual(posts[0]["facets"][0]["features"][0]["uri"], "https://stspg.io/abc1")
         long_entry = dict(entry, title="t" * 400)
         self.assertLessEqual(len(g.resurrection_thread("GitHub", long_entry, NOW)[0]["text"]), 300)

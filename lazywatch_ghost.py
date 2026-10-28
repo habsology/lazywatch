@@ -337,21 +337,45 @@ def thread(header, lines, quote, link, images=None):
     return [_post(t, link if i == 0 else None, images if i == 0 else None) for i, t in enumerate(texts) if t.strip()]
 
 
-def haunting_thread(incident, form, poem, quote, images=None):
+def status_post(incident, shot=None, now=None):
+    """The thread's last post: the status page itself, written the way people search for an outage
+    ("Is GitHub down?"): the product's name, what its status page reports, since when, and when the
+    screenshot was taken. The screenshot is its only image."""
+    now = now or datetime.now(timezone.utc)
+    service, title = incident["service"], incident["title"]
+    since = _when(incident["since"])
+    taken = _when(now.isoformat())
+    link = (_host(incident.get("page") or incident["url"]), incident["url"])
+
+    def text_for(t):
+        s = f"Is {service} down? Its status page has reported \u201c{t}\u201d" + (f" since {since}" if since else "") + "."
+        s += f"\n\n{'Screenshot taken' if shot else 'Status page checked'} {taken}."
+        return s + f"\n\nSource: {link[0]}"
+
+    text = text_for(title)
+    if _length(text) > POST_LIMIT:
+        room = len(title) - (_length(text) - POST_LIMIT)
+        text = text_for(_shorten(title, max(room, 12)))
+    return _post(text, link, [shot] if shot else None)
+
+
+def haunting_thread(incident, form, poem, quote, images=None, shot=None, now=None):
+    """The verse (card on the first post, quote last), then the status page as the closing post."""
     header = f"\U0001F47B {HEADLINE[form]} {incident['service']}"
     since = _when(incident["since"])
     if since:
         header += f", down since {since}"
     lines = [l for l in poem.splitlines() if l.strip()]
-    return thread(header, lines, quote, (_host(incident.get("page") or incident["url"]), incident["url"]), images)
+    verse = thread(header, lines, quote, (_host(incident.get("page") or incident["url"]), incident["url"]), images)
+    return verse + [status_post(incident, shot, now)]
 
 
 def resurrection_thread(service, entry, now, images=None):
     since = _when(entry.get("since") or entry["first_seen"])
     lasted = _duration(entry.get("since") or entry["first_seen"], now)
     title = entry["title"]
-    text = (f"\U0001F47B {service} has risen. “{title}” haunted the status page for {lasted}"
-            + (f" (since {since})" if since else "") + ". Lights back on, candles out. \U0001F56F️")
+    text = (f"\U0001F47B {service} has risen, back up after {lasted}. “{title}” haunted the status page"
+            + (f" since {since}" if since else "") + ". Lights back on, candles out. \U0001F56F️")
     link = (_host(entry.get("page") or entry["url"]), entry["url"])
     tail = f"\n\nSource: {link[0]}"
     if _length(text + tail) > POST_LIMIT:
@@ -641,14 +665,9 @@ def haunt(sites, state, ask=ask_ghost, poster=None, fetch=fetch_feed, shooter=sc
             quote, verified = verify_quote(reply, inc["update"], inc["title"])
             if newsy(quote):
                 quote, verified = inc["title"], False
-            images = []
             card = cards(card_spec("haunting", inc, entry["form"], poem, quote), out_dir, _slug(ident)) if cards else None
-            if card:
-                images.append(card)
             shot = shooter(inc["url"], name) if shooter else None
-            if shot:
-                images.append(shot)
-            posts_ = haunting_thread(inc, entry["form"], poem, quote, images)
+            posts_ = haunting_thread(inc, entry["form"], poem, quote, [card] if card else None, shot, now)
             try:
                 uris = poster(posts_)
             except Exception as exc:
