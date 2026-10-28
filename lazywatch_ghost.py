@@ -220,6 +220,12 @@ def site_words(site_name):
     return {w.casefold() for w in re.findall(r"[A-Za-z]+", site_name)}
 
 
+SELF_TALK = {"welcome", "free", "join", "sign", "members", "member", "account", "search", "download", "home", "homepage",
+             "page", "pages", "email", "mail", "chat", "music", "photos", "friends", "community", "share", "browse",
+             "explore", "ask", "answers", "questions", "news", "web", "internet", "online", "site", "click", "start",
+             "try", "get", "create", "build", "new", "today"}
+
+
 def about_the_site(paragraph, site_name):
     """Keep a paragraph from an archived home page only if it reads like the site talking about itself:
     nothing newsy, and no capitalised pair of words that could be a person's name (the site's own name is fine)."""
@@ -230,7 +236,10 @@ def about_the_site(paragraph, site_name):
     for a, b in re.findall(r"\b([A-Z][a-z]+) ([A-Z][a-z]+)\b", paragraph):
         if a.casefold() not in ok and b.casefold() not in ok:
             return False
-    return True
+    # and it must sound like the site itself: its own name, or the words home pages use about themselves.
+    # Pages full of what users posted (Yahoo! Answers questions) carry neither, and may name real people in lower case.
+    words = set(re.findall(r"[a-z0-9]+", paragraph.casefold()))
+    return bool(words & (site_words(site_name) | SELF_TALK))
 
 
 def _length(text):

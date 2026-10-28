@@ -124,6 +124,8 @@ class Verse(unittest.TestCase):
         self.assertFalse(g.about_the_site("Senate panel to question Jane Doe on Tuesday", "Yahoo! Answers"))
         self.assertFalse(g.about_the_site("A new album from Taylor Swift", "Yahoo! Answers"))
         self.assertTrue(g.about_the_site("Yahoo Answers is the best place to ask questions", "Yahoo! Answers"))
+        self.assertFalse(g.about_the_site("If I was a corporate ceo at a oil company I too would be having nightmares about elon musk.",
+                                          "Yahoo! Answers"))                 # a user's post, real person in lower case
 
     def test_long_verse_threads_into_replies(self):
         posts = g.haunting_thread(self.inc, "epic", g.clean_poem(LONG), LONG["quote"], [FAKE_CARD({"headline": "x"})])
