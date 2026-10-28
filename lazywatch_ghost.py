@@ -35,7 +35,7 @@ import sys
 import unicodedata
 import urllib.parse
 import urllib.request
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import lazywatch
@@ -385,7 +385,7 @@ def resurrection_thread(service, entry, now, images=None):
 
 
 # ---------------------------------------------------------------- cards and screenshots
-def card_spec(kind, incident=None, form=None, poem="", quote="", entry=None, service=None, now=None, site=None):
+def card_spec(kind, incident=None, form=None, poem="", quote="", entry=None, service=None, now=None, site=None, week=None):
     if kind == "haunting":
         tag = f"The Downtime Ghost · {incident['service']}"
         since = _when(incident["since"])
@@ -398,6 +398,10 @@ def card_spec(kind, incident=None, form=None, poem="", quote="", entry=None, ser
                 "headline": f"{service} has risen", "sub": entry["title"],
                 "poem": f"Haunted the status page for {lasted}.\nLights back on, candles out.",
                 "quote": "", "source": f"Source: {_host(entry.get('page') or entry['url'])}"}
+    if kind == "ofrenda":
+        return {"kind": kind, "tag": f"The Downtime Ghost · Ofrenda · week of {week}", "headline": "Ofrenda",
+                "sub": "The week's fallen services, and their time in the underworld", "poem": poem, "quote": quote,
+                "source": "Source: the official status pages"}
     return {"kind": "throwback", "tag": f"Throwback Thursday · from the Wayback Machine · {site['born']} to {site['died']}",
             "headline": f"In memoriam: {site['name']}", "sub": site.get("seen", ""),
             "poem": poem, "quote": quote, "source": "Source: web.archive.org"}
@@ -633,7 +637,8 @@ def haunt(sites, state, ask=ask_ghost, poster=None, fetch=fetch_feed, shooter=sc
             report["posted"] += 1
             if not dry_run:
                 _log(state, {"when": now.isoformat(), "kind": "resurrection", "service": name, "id": ident,
-                             "title": entry["title"], "key": resurrection_key(name, entry), "text": posts_[0]["text"],
+                             "title": entry["title"], "since": entry.get("since") or entry["first_seen"],
+                             "key": resurrection_key(name, entry), "text": posts_[0]["text"],
                              "uri": uris[0]})
 
         for ident, inc in current.items():                                     # new or still unwritten: the verse
@@ -678,7 +683,7 @@ def haunt(sites, state, ask=ask_ghost, poster=None, fetch=fetch_feed, shooter=sc
             entry["posted"] = {"when": now.isoformat(), "uri": uris[0]}
             if not dry_run:
                 _log(state, {"when": now.isoformat(), "kind": "haunting", "service": name, "id": ident,
-                             "form": entry["form"], "title": inc["title"], "quote": quote, "verified": verified,
+                             "form": entry["form"], "title": inc["title"], "since": inc["since"], "quote": quote, "verified": verified,
                              "lines": len(poem.splitlines()), "posts": len(posts_), "key": haunting_key(inc, entry["form"]),
                              "text": posts_[0]["text"], "uri": uris[0]})
                 lazywatch._store("record_change", {"site": f"ghost:{name}", "url": inc["url"],
@@ -854,9 +859,104 @@ def graveyard(state):
     return "\n".join(out)
 
 
+# ---------------------------------------------------------------- Saturday ofrenda
+def _span(minutes):
+    if minutes >= 2 * 24 * 60:
+        return f"{minutes // (24 * 60)} days"
+    h, m = divmod(int(minutes), 60)
+    return f"{h} h {m} min" if h and m else (f"{h} h" if h else f"{m} min")
+
+
+def fallen(state, now, days=7):
+    """The week's hauntings from the ghost's own log: who fell, since when, risen when (or still haunted)."""
+    start = now - timedelta(days=days)
+    rows = posts(state)
+    risen = {(r.get("service"), r.get("id")): r["when"] for r in rows if r.get("kind") == "resurrection" and r.get("uri")}
+    out = []
+    for r in rows:
+        if r.get("kind") != "haunting" or not r.get("uri"):
+            continue
+        up = risen.get((r.get("service"), r.get("id")))
+        posted, back = _parse(r.get("when")), _parse(up) if up else None
+        if not posted or (posted < start and not (back and back >= start)):
+            continue
+        since = _parse(r.get("since")) or posted
+        minutes = max(int(((back or now) - since).total_seconds() // 60), 0)
+        out.append({"service": r["service"], "title": r.get("title", ""), "since": since.isoformat(),
+                    "risen": up, "minutes": minutes})
+    return out
+
+
+def altar(rows, now, days=7):
+    """(week label, [(service, {n, minutes, open})] longest first, total minutes)."""
+    start = now - timedelta(days=days - 1)
+    week = f"{start.strftime('%b')} {start.day} to " + (str(now.day) if start.month == now.month else f"{now.strftime('%b')} {now.day}")
+    by = {}
+    for f in rows:
+        b = by.setdefault(f["service"], {"n": 0, "minutes": 0, "open": False})
+        b["n"] += 1
+        b["minutes"] += f["minutes"]
+        b["open"] = b["open"] or not f["risen"]
+    items = sorted(by.items(), key=lambda kv: (-kv[1]["minutes"], kv[0]))
+    return week, items, sum(b["minutes"] for _, b in items)
+
+
+def ofrenda_key(week):
+    return f"Ofrenda week of {week}"
+
+
+def ofrenda_text(week, items, total):
+    head = f"\U0001F56F\ufe0f Ofrenda, week of {week}: "
+    if not items:
+        return head + "nobody fell. The candles burn for an empty altar. \U0001F47B"
+
+    def line(name, b):
+        return name + (f" ×{b['n']}" if b["n"] > 1 else "") + f" {_span(b['minutes'])}" + (" (still haunted)" if b["open"] else "")
+
+    def build(k):
+        more = len(items) - k
+        return (head + f"{len(items)} service{'s' if len(items) != 1 else ''} fell. "
+                + ", ".join(line(n, b) for n, b in items[:k]) + (f" and {more} more" if more > 0 else "")
+                + f". {_span(total)} in the underworld in all. \U0001F47B")
+
+    for k in range(len(items), 0, -1):
+        if _length(build(k)) <= POST_LIMIT:
+            return build(k)
+    return _shorten(build(1), POST_LIMIT)
+
+
+def ofrenda(state, poster=None, cards=render_card, now=None, dry_run=False, out_dir=None, seen_live=None, days=7):
+    """Saturday: the week's fallen services on one amber card, with their time in the underworld. One post."""
+    now = now or datetime.now(timezone.utc)
+    live = poster is None and not dry_run
+    poster = poster or (print_poster if dry_run else BlueskyPoster())
+    seen_live = seen_live or (LiveFeedCheck() if live else (lambda key: False))
+    if MAX_POSTS_PER_DAY - posted_today(state, now) <= 0:
+        print("ofrenda held back by the daily cap", file=sys.stderr)
+        return 0
+    week, items, total = altar(fallen(state, now, days), now, days)
+    if seen_live(ofrenda_key(week)):
+        print("ofrenda already on the feed", file=sys.stderr)
+        return 0
+    text = ofrenda_text(week, items, total)
+    lines = [f"{n}{' ×' + str(b['n']) if b['n'] > 1 else ''} · {_span(b['minutes'])}" + (" · still haunted" if b["open"] else "")
+             for n, b in items[:MAX_LINES]] or ["Nobody fell this week."]
+    quote = f"{_span(total)} in the underworld in all." if items else "The candles burn for an empty altar."
+    card = cards(card_spec("ofrenda", poem="\n".join(lines), quote=quote, week=week), out_dir, "ofrenda") if cards else None
+    post = _post(text, None, [card] if card else None)
+    try:
+        uris = poster([post])
+    except Exception as exc:
+        print(f"ofrenda not posted ({exc.__class__.__name__}: {str(exc)[:80]})", file=sys.stderr)
+        return 0
+    if not dry_run:
+        _log(state, {"when": now.isoformat(), "kind": "ofrenda", "key": ofrenda_key(week), "text": text, "uri": uris[0]})
+    return 1
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("command", nargs="?", default="haunt", choices=["haunt", "graveyard", "rehearse", "throwback"])
+    ap.add_argument("command", nargs="?", default="haunt", choices=["haunt", "graveyard", "rehearse", "throwback", "ofrenda"])
     ap.add_argument("--config", default="statuspages.json")
     ap.add_argument("--graves", default="throwback.json")
     ap.add_argument("--state", default="state")
@@ -875,6 +975,10 @@ def main(argv=None):
         sites = json.loads(Path(args.graves).read_text())
         n = throwback(sites, args.state, dry_run=dry, count=args.count, out_dir=args.out)
         print(f"{n} graves visited" + (" (dry run)" if dry else ""))
+        return 0
+    if args.command == "ofrenda":
+        n = ofrenda(args.state, dry_run=dry, out_dir=args.out)
+        print(("ofrenda posted" if n else "no ofrenda") + (" (dry run)" if dry else ""))
         return 0
     sites = json.loads(Path(args.config).read_text())
     if args.only:

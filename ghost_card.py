@@ -15,8 +15,8 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 FONTS = HERE / "fonts"
 SIZE = 1080
-INK = {"haunting": "#EB4650", "risen": "#5BE49B", "throwback": "#F2C14E"}
-LABEL = {"haunting": "DOWN", "risen": "RISEN", "throwback": "THROWBACK THURSDAY"}
+INK = {"haunting": "#EB4650", "risen": "#5BE49B", "throwback": "#F2C14E", "ofrenda": "#F2C14E"}
+LABEL = {"haunting": "DOWN", "risen": "RISEN", "throwback": "THROWBACK THURSDAY", "ofrenda": "OFRENDA"}
 
 
 def _e(text):
@@ -113,7 +113,7 @@ def render(spec, out=None):
 def alt_text(spec):
     """Say what is shown, then the words on it (the pattern the other accounts use)."""
     kind = spec.get("kind", "haunting")
-    lamp = {"haunting": "a red lamp", "risen": "a green lamp", "throwback": "an amber candle"}.get(kind, "a lamp")
+    lamp = {"haunting": "a red lamp", "risen": "a green lamp", "throwback": "an amber candle", "ofrenda": "an amber candle"}.get(kind, "a lamp")
     parts = [f"Dark card with a small white ghost and {lamp}. {spec.get('tag', '')}. {spec.get('headline', '')}."]
     if spec.get("sub"):
         parts.append(str(spec["sub"]) + ".")

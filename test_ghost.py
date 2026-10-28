@@ -298,6 +298,55 @@ class NeverTwice(unittest.TestCase):
         self.assertEqual(g.load_state(tmp, "throwback.json", []), ["GeoCities"])
 
 
+class Ofrenda(unittest.TestCase):
+    SAT = datetime(2026, 10, 31, 15, 0, tzinfo=timezone.utc)
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        rows = [
+            {"when": "2026-10-28T01:28:00Z", "kind": "haunting", "service": "Cloudflare", "id": "Cloudflare:k1", "title": "Durable Objects",
+             "since": "2026-10-28T00:17:00Z", "uri": "at://x/1"},
+            {"when": "2026-10-28T01:29:00Z", "kind": "resurrection", "service": "Cloudflare", "id": "Cloudflare:k1", "uri": "at://x/2"},
+            {"when": "2026-10-28T01:29:00Z", "kind": "haunting", "service": "DigitalOcean", "id": "DigitalOcean:d1", "title": "Kubernetes",
+             "since": "2026-10-27T22:14:00Z", "uri": "at://x/3"},
+            {"when": "2026-10-20T01:00:00Z", "kind": "haunting", "service": "GitHub", "id": "GitHub:old", "title": "Old",
+             "since": "2026-10-20T00:00:00Z", "uri": "at://x/4"},                                   # last week: not on this altar
+            {"when": "2026-10-29T01:00:00Z", "kind": "haunting", "service": "Slack", "id": "Slack:s1", "title": "Dry", "since": "2026-10-29T00:00:00Z"},  # never posted
+        ]
+        for r in rows:
+            g._log(self.tmp, r)
+        self.threads = []
+
+    def poster(self, posts):
+        self.threads.append(posts)
+        return ["at://x/ofrenda"]
+
+    def test_week_of_the_fallen(self):
+        week, items, total = g.altar(g.fallen(self.tmp, self.SAT), self.SAT)
+        self.assertEqual(week, "Oct 25 to 31")
+        self.assertEqual([n for n, _ in items], ["DigitalOcean", "Cloudflare"])              # longest first; GitHub and Slack left out
+        self.assertEqual(dict(items)["Cloudflare"], {"n": 1, "minutes": 72, "open": False})
+        self.assertTrue(dict(items)["DigitalOcean"]["open"])
+        self.assertEqual(g.ofrenda_text(week, items, total),
+                         "🕯️ Ofrenda, week of Oct 25 to 31: 2 services fell. DigitalOcean 3 days (still haunted), Cloudflare 1 h 12 min. "
+                         "3 days in the underworld in all. 👻")
+        self.assertEqual(g.ofrenda_text("Nov 1 to 7", [], 0), "🕯️ Ofrenda, week of Nov 1 to 7: nobody fell. The candles burn for an empty altar. 👻")
+        many = [(f"Service{n}", {"n": 1, "minutes": 60 + n, "open": False}) for n in range(40)]
+        self.assertLessEqual(len(g.ofrenda_text("Nov 1 to 7", many, 3000)), 300)
+        self.assertIn(" more.", g.ofrenda_text("Nov 1 to 7", many, 3000))
+
+    def test_posts_once_with_a_card(self):
+        n = g.ofrenda(self.tmp, poster=self.poster, cards=FAKE_CARD, now=self.SAT)
+        self.assertEqual(n, 1)
+        post = self.threads[0][0]
+        self.assertTrue(post["text"].startswith("🕯️ Ofrenda, week of Oct 25 to 31: 2 services fell."))
+        self.assertEqual(post["images"][0]["alt"], "card: Ofrenda")
+        self.assertEqual(g.posts(self.tmp)[-1]["kind"], "ofrenda")
+        self.assertEqual(g.ofrenda(self.tmp, poster=self.poster, cards=FAKE_CARD, now=self.SAT, seen_live=lambda k: True), 0)
+        self.assertEqual(len(self.threads), 1)
+        self.assertIn(g.fingerprint(g.ofrenda_key("Oct 25 to 31")), g.fingerprint(post["text"]))   # the live-feed check can find it
+
+
 class Throwback(unittest.TestCase):
     SITES = [{"name": "GeoCities", "url": "http://www.geocities.com/", "when": "20090601", "born": 1994, "died": 2009, "note": "n"},
              {"name": "Vine", "url": "https://vine.co/", "when": "20160901", "born": 2013, "died": 2017, "note": "n"},
