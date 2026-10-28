@@ -100,12 +100,23 @@ jobs:
         run: |
           mkdir -p state/ghost out
           if [ "$SCHEDULE" = "33 14 * * 4" ]; then MODE=throwback; fi
+          # Throwback Thursday happens once per Thursday, whichever run gets there first: the 14:33 cron
+          # when GitHub honours it, else the first haunt after 14:00 UTC. The marker travels with the state.
+          today=$(date -u +%F)
+          throwback_once() {
+            if [ "$(cat state/ghost/throwback-day 2>/dev/null)" = "$today" ]; then
+              echo "graves already visited today"
+            else
+              python lazywatch_ghost.py throwback --out out && echo "$today" > state/ghost/throwback-day
+            fi
+          }
           case "$MODE" in
             rehearse)          python lazywatch_ghost.py rehearse --out out ;;
             dry-run)           python lazywatch_ghost.py --dry-run --out out ;;
-            throwback)         python lazywatch_ghost.py throwback --out out ;;
+            throwback)         throwback_once ;;
             throwback-dry-run) python lazywatch_ghost.py throwback --dry-run --out out ;;
-            *)                 python lazywatch_ghost.py --out out ;;
+            *)                 python lazywatch_ghost.py --out out
+                               if [ "$(date -u +%u)" = 4 ] && [ "$(date -u +%H)" -ge 14 ]; then throwback_once; fi ;;
           esac
           python lazywatch_ghost.py graveyard
 
