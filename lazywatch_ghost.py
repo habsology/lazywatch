@@ -941,8 +941,8 @@ def ofrenda(state, poster=None, cards=render_card, now=None, dry_run=False, out_
     text = ofrenda_text(week, items, total)
     lines = [f"{n}{' ×' + str(b['n']) if b['n'] > 1 else ''} · {_span(b['minutes'])}" + (" · still haunted" if b["open"] else "")
              for n, b in items[:MAX_LINES]] or ["Nobody fell this week."]
-    quote = f"{_span(total)} in the underworld in all." if items else "The candles burn for an empty altar."
-    card = cards(card_spec("ofrenda", poem="\n".join(lines), quote=quote, week=week), out_dir, "ofrenda") if cards else None
+    lines += ["", f"{_span(total)} in the underworld in all." if items else "The candles burn for an empty altar."]
+    card = cards(card_spec("ofrenda", poem="\n".join(lines), week=week), out_dir, "ofrenda") if cards else None
     post = _post(text, None, [card] if card else None)
     try:
         uris = poster([post])
