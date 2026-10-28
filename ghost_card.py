@@ -66,7 +66,7 @@ h1{{position:absolute;left:80px;top:124px;width:920px;font:700 68px/1.04 SG;lett
 .src{{position:absolute;right:80px;bottom:92px;max-width:700px;font:500 20px SG;letter-spacing:.1em;color:#8E8BB0;
   text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
 </style><div class="sky"></div>
-<div class="tag"><div class="dot"></div>{_e(spec.get("tag", "The Downtime Ghost"))}</div>
+<div class="tag" id="tag"><div class="dot"></div><span>{_e(spec.get("tag", "The Downtime Ghost"))}</span></div>
 <h1>{_e(spec.get("headline", ""))}</h1>
 <div class="sub">{_e(spec.get("sub", ""))}</div>
 <div class="poem" id="poem">{poem}</div>
@@ -76,6 +76,9 @@ h1{{position:absolute;left:80px;top:124px;width:920px;font:700 68px/1.04 SG;lett
 
 
 FIT_JS = """() => {
+  const t = document.getElementById('tag');                                      // the top line never clips
+  let ts = 21;
+  while (ts > 13 && t.scrollWidth > t.clientWidth) { ts -= 1; t.style.fontSize = ts + 'px'; }
   const p = document.getElementById('poem');
   const over = () => p.scrollHeight > p.clientHeight || p.scrollWidth > p.clientWidth;
   let size = 60;
