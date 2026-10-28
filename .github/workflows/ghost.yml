@@ -103,11 +103,14 @@ jobs:
           # Throwback Thursday (and the Saturday ofrenda, after 15:00 UTC) happen once a day, whichever run gets there first: the cron
           # when GitHub honours it, else the first haunt after 14:00 UTC. The marker travels with the state.
           today=$(date -u +%F)
+          # Thursdays: one grave per hourly run from 14:00 UTC (10 am Montreal), six in all, so the day has a steady drip.
           throwback_once() {
-            if [ "$(cat state/ghost/throwback-day 2>/dev/null)" = "$today" ]; then
-              echo "graves already visited today"
+            read -r day done_ < state/ghost/throwback-day 2>/dev/null || true
+            [ "$day" = "$today" ] || done_=0
+            if [ "${done_:-0}" -ge 6 ]; then
+              echo "six graves already visited today"
             else
-              python lazywatch_ghost.py throwback --out out && echo "$today" > state/ghost/throwback-day
+              python lazywatch_ghost.py throwback --count 1 --out out && echo "$today $(( ${done_:-0} + 1 ))" > state/ghost/throwback-day
             fi
           }
           ofrenda_once() {
