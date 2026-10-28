@@ -1,4 +1,4 @@
-"""The Uptime Ghost: lazywatch for status pages, with a sense of humour.
+"""The Downtime Ghost: lazywatch for status pages, with a sense of humour.
 
 Every hour it reads the official status feed of each service in statuspages.json.
 When a new incident appears, Gemma 3 4B writes a short ode (or a ballad, a hymn, a
@@ -157,7 +157,7 @@ def pick_form(incident_id):
 def ghost_prompt(incident, form):
     affected = ", ".join(incident["affected"][:4])
     return (
-        "You are The Uptime Ghost, a theatrical but kind spirit who haunts status pages and writes verse "
+        "You are The Downtime Ghost, a theatrical but kind spirit who haunts status pages and writes verse "
         "when a service goes down. You tease the outage, never the people fixing it.\n"
         f"SERVICE: {incident['service']}\n"
         f"INCIDENT: {incident['title']}\n"
@@ -363,14 +363,14 @@ def resurrection_thread(service, entry, now, images=None):
 # ---------------------------------------------------------------- cards and screenshots
 def card_spec(kind, incident=None, form=None, poem="", quote="", entry=None, service=None, now=None, site=None):
     if kind == "haunting":
-        tag = f"The Uptime Ghost · {incident['service']}"
+        tag = f"The Downtime Ghost · {incident['service']}"
         since = _when(incident["since"])
         return {"kind": kind, "tag": tag + (f" · down since {since}" if since else ""),
                 "headline": f"{HEADLINE[form]} {incident['service']}", "sub": incident["title"],
                 "poem": poem, "quote": quote, "source": f"Source: {_host(incident.get('page') or incident['url'])}"}
     if kind == "risen":
         lasted = _duration(entry.get("since") or entry["first_seen"], now)
-        return {"kind": kind, "tag": f"The Uptime Ghost · {service} · risen {_when(now.isoformat())}",
+        return {"kind": kind, "tag": f"The Downtime Ghost · {service} · risen {_when(now.isoformat())}",
                 "headline": f"{service} has risen", "sub": entry["title"],
                 "poem": f"Haunted the status page for {lasted}.\nLights back on, candles out.",
                 "quote": "", "source": f"Source: {_host(entry.get('page') or entry['url'])}"}
@@ -694,7 +694,7 @@ def wayback(site, fetch_json=None, fetch_html=None):
 def throwback_prompt(site, paragraphs):
     text = "\n".join(f"- {p[:300]}" for p in paragraphs[:25])
     return (
-        "You are The Uptime Ghost, a theatrical but kind spirit. Tonight is Throwback Thursday and you are "
+        "You are The Downtime Ghost, a theatrical but kind spirit. Tonight is Throwback Thursday and you are "
         f"visiting the grave of {site['name']} ({site['born']} to {site['died']}): {site.get('note', '')}.\n"
         f"WHAT ITS ARCHIVED HOME PAGE SAID:\n{text}\n\n"
         f"Write an elegy for {site['name']}: 6 to 10 short lines, one line per line, fond and a little funny, "

@@ -148,7 +148,7 @@ class Verse(unittest.TestCase):
     def test_card_specs(self):
         spec = g.card_spec("haunting", self.inc, "ode", "a\nb", "q")
         self.assertEqual(spec["headline"], "An ode to GitHub")
-        self.assertEqual(spec["tag"], "The Uptime Ghost · GitHub · down since Oct 28, 2026, 14:02 UTC")
+        self.assertEqual(spec["tag"], "The Downtime Ghost · GitHub · down since Oct 28, 2026, 14:02 UTC")
         self.assertEqual(spec["source"], "Source: www.githubstatus.com")
         risen = g.card_spec("risen", entry={"title": "t", "since": "2026-10-28T13:16:00Z", "url": "https://x.y/z", "first_seen": "x"},
                             service="GitHub", now=NOW)

@@ -1,4 +1,4 @@
-name: Uptime Ghost
+name: Downtime Ghost
 # Every hour: read the status feeds in statuspages.json, write verse for new incidents, post to Bluesky.
 # Posts only when the BLUESKY_* secrets exist; without them the run is a dry run that prints what it would post.
 # State (which incidents the ghost has already sung about) travels between runs in the Actions cache.

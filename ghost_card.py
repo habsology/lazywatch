@@ -1,4 +1,4 @@
-"""The Uptime Ghost's image cards: 1080x1080, HTML and CSS rendered with Playwright's Chromium.
+"""The Downtime Ghost's image cards: 1080x1080, HTML and CSS rendered with Playwright's Chromium.
 
 A card carries the verse, the one verbatim quote and the source, in the ghost's colours:
 night navy, ghost white, a red lamp for an outage, a green one once the service has risen,
@@ -66,7 +66,7 @@ h1{{position:absolute;left:80px;top:124px;width:920px;font:700 68px/1.04 SG;lett
 .src{{position:absolute;right:80px;bottom:92px;max-width:700px;font:500 20px SG;letter-spacing:.1em;color:#8E8BB0;
   text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
 </style><div class="sky"></div>
-<div class="tag"><div class="dot"></div>{_e(spec.get("tag", "The Uptime Ghost"))}</div>
+<div class="tag"><div class="dot"></div>{_e(spec.get("tag", "The Downtime Ghost"))}</div>
 <h1>{_e(spec.get("headline", ""))}</h1>
 <div class="sub">{_e(spec.get("sub", ""))}</div>
 <div class="poem" id="poem">{poem}</div>
