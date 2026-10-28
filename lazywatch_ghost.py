@@ -77,7 +77,9 @@ NEWSY = re.compile(r"\b(Mr|Mrs|Ms|Dr|Sen|Rep|Gov|Pres)\.|\b(said|says|police|inv
 # ---------------------------------------------------------------- the feeds
 def fetch_feed(site):
     with urllib.request.urlopen(urllib.request.Request(site["url"], headers=lazywatch.UA), timeout=30) as r:
-        return json.loads(r.read().decode("utf-8", "replace"))
+        raw = r.read()
+    text = raw.decode("utf-16") if raw[:2] in (b"\xff\xfe", b"\xfe\xff") else raw.decode("utf-8-sig", "replace")  # AWS sends UTF-16
+    return text if site.get("format") == "rss" else json.loads(text)
 
 
 def _text(s):
@@ -97,8 +99,9 @@ def _latest(items, body_key, date_key):
     return best.get(body_key, "")
 
 
-def _incident(site, ident, title, impact, status, url, update, since, affected):
-    return {"service": site["name"], "id": f"{site['name']}:{ident}", "title": _text(title), "impact": str(impact or ""),
+def _incident(site, ident, title, impact, status, url, update, since, affected, service=None):
+    """service: the product people search for, when one feed covers several (Gmail, iCloud Mail); the id keeps the feed's name."""
+    return {"service": service or site["name"], "id": f"{site['name']}:{ident}", "title": _text(title), "impact": str(impact or ""),
             "status": str(status or ""), "url": url or site["page"], "page": site["page"], "update": _text(update),
             "since": str(since or ""), "affected": [_text(a) for a in affected if a]}
 
@@ -138,11 +141,105 @@ def _google(site, data):
         out.append(_incident(site, inc.get("id"), inc.get("external_desc"),
                              str(inc.get("status_impact", "")).lower().replace("service_", ""), "open", url,
                              (inc.get("most_recent_update") or {}).get("text"), inc.get("begin"),
-                             [inc.get("service_name")]))
+                             [inc.get("service_name")], inc.get("service_name") if site.get("by_product") else None))
     return out
 
 
-PARSERS = {"statuspage": _statuspage, "slack": _slack, "google": _google}
+FRESH_DAYS = 7          # a feed's long-running event (a region down for months) is not news: only recent starts
+
+
+def _fresh(when):
+    return bool(when) and (datetime.now(timezone.utc) - when).days < FRESH_DAYS
+
+
+def _epoch(value, ms=False):
+    try:
+        return datetime.fromtimestamp(float(value) / (1000 if ms else 1), timezone.utc)
+    except (TypeError, ValueError):
+        return None
+
+
+def _aws(site, data):
+    """AWS Health public dashboard (currentevents): open events only; the newest log entry is the update."""
+    out = []
+    for ev in data if isinstance(data, list) else []:
+        since = _epoch(ev.get("date"))
+        if str(ev.get("status")) == "0" or not _fresh(since):
+            continue
+        log = [e for e in ev.get("event_log") or [] if isinstance(e, dict)]
+        last = max(log, key=lambda e: float(e.get("timestamp") or 0)) if log else {}
+        title = f"{last.get('summary') or ev.get('summary')}: {ev.get('service_name')} in {ev.get('region_name')}"
+        out.append(_incident(site, ev.get("arn"), title, ev.get("status"), "open", site["page"], last.get("message"),
+                             since.isoformat(), [ev.get("service_name")]))
+    return out
+
+
+def _apple(site, data):
+    """Apple System Status: an event still open on a service; maintenance is skipped. Each service is its own name."""
+    out = []
+    for svc in (data or {}).get("services") or []:
+        for ev in svc.get("events") or []:
+            if ev.get("eventStatus") in ("resolved", "completed") or ev.get("statusType") == "Maintenance":
+                continue
+            since = _epoch(ev.get("epochStartDate"), ms=True)
+            if not _fresh(since):
+                continue
+            name = svc.get("serviceName")
+            out.append(_incident(site, ev.get("messageId"), f"{name} {str(ev.get('statusType') or 'issue').lower()}",
+                                 ev.get("statusType"), ev.get("eventStatus"), site["page"], ev.get("message"),
+                                 since.isoformat(), [name], name))
+    return out
+
+
+def _paypal(site, data):
+    """PayPal status: components only, no incident notes; a production component off 'Operational' is the incident."""
+    out = []
+    for c in (data or {}).get("result") or []:
+        state = ((c.get("status") or {}).get("production") or "").strip()
+        if not state or state.lower() == "operational" or "maintenance" in state.lower():
+            continue
+        name = c.get("displayName") or c.get("name")
+        out.append(_incident(site, f"{c.get('id')}-{_slug(state)}", f"{name}: {state}", state, "open", site["page"],
+                             f"{name} is reporting {state} on the PayPal status page", "", [name]))
+    return out
+
+
+def _rss(site, data):
+    """An RSS status feed (Azure): every item is an open incident; the feed drops it once resolved."""
+    import xml.etree.ElementTree as ET
+    from email.utils import parsedate_to_datetime
+    out = []
+    try:
+        root = ET.fromstring(data)
+    except ET.ParseError:
+        return out
+    for item in root.iter("item"):
+        get = lambda tag: (item.findtext(tag) or "").strip()
+        try:
+            since = parsedate_to_datetime(get("pubDate")).astimezone(timezone.utc).isoformat()
+        except (TypeError, ValueError):
+            since = ""
+        out.append(_incident(site, get("guid") or get("link") or get("title"), get("title"), "", "open",
+                             get("link") or site["page"], get("description"), since, []))
+    return out
+
+
+IMPACT = {"none": 0, "minor": 1, "major": 2, "critical": 3}
+NEW_HOURS = 48          # an incident first seen after it has been open this long is old news: no verse
+
+
+def worth_a_poem(site, inc, now):
+    """The noise gate: a feed can ask for a minimum impact (Twilio files every carrier hiccup), and an incident
+    that has been open for days when the ghost first sees it (a newly added feed, a forgotten advisory) is skipped."""
+    floor = site.get("min_impact")
+    if floor and IMPACT.get(str(inc.get("impact")).lower(), 0) < IMPACT.get(floor, 0):
+        return False
+    since = _parse(inc.get("since")) if inc.get("since") else None
+    return not since or (now - since).total_seconds() < NEW_HOURS * 3600
+
+
+PARSERS = {"statuspage": _statuspage, "slack": _slack, "google": _google, "aws": _aws, "apple": _apple,
+           "paypal": _paypal, "rss": _rss}
 
 
 def open_incidents(site, data):
@@ -625,6 +722,7 @@ def haunt(sites, state, ask=ask_ghost, poster=None, fetch=fetch_feed, shooter=sc
             entry = entries.pop(ident)
             if not entry.get("posted"):
                 continue
+            name = entry.get("service") or site["name"]
             if budget <= 0:
                 report["skipped"] += 1
                 continue
@@ -650,11 +748,15 @@ def haunt(sites, state, ask=ask_ghost, poster=None, fetch=fetch_feed, shooter=sc
                              "key": resurrection_key(name, entry), "text": posts_[0]["text"],
                              "uri": uris[0]})
 
+        name = site["name"]
         for ident, inc in current.items():                                     # new or still unwritten: the verse
             entry = entries.setdefault(ident, {"title": inc["title"], "since": inc["since"], "url": inc["url"],
+                                               "service": inc["service"],
                                                "page": inc["page"], "first_seen": now.isoformat(), "form": pick_form(ident),
                                                "attempts": 0, "posted": None})
             if entry.get("posted") or entry["attempts"] >= MAX_ATTEMPTS:
+                continue
+            if not worth_a_poem(site, inc, now):
                 continue
             if budget <= 0:
                 report["skipped"] += 1

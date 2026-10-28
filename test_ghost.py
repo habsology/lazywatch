@@ -68,6 +68,44 @@ class Parsing(unittest.TestCase):
         self.assertEqual(g._text("## Incident Report\n**Start**: <p>08 October</p> and 2*3"), "Incident Report Start: 08 October and 2*3")
 
 
+class MoreFeeds(unittest.TestCase):
+    def test_aws_apple_paypal_rss(self):
+        now = datetime.now(timezone.utc).timestamp()
+        aws = [{"date": str(int(now - 3600)), "arn": "arn:1", "region_name": "N. Virginia", "status": "2", "service_name": "Amazon EC2",
+                "summary": "x", "event_log": [{"summary": "Increased Error Rates", "message": "We are investigating.", "timestamp": now - 3600},
+                                              {"summary": "Increased Error Rates", "message": "We have identified the cause.", "timestamp": now - 60}]},
+               {"date": "1772369485", "arn": "arn:old", "region_name": "UAE", "status": "3", "service_name": "Multiple services",
+                "summary": "Region Availability", "event_log": []}]                        # months old: not news
+        site = {"name": "AWS", "page": "https://health.aws.amazon.com/health/status", "format": "aws"}
+        [inc] = g.open_incidents(site, aws)
+        self.assertEqual((inc["service"], inc["title"], inc["update"]),
+                         ("AWS", "Increased Error Rates: Amazon EC2 in N. Virginia", "We have identified the cause."))
+        apple = {"services": [{"serviceName": "iCloud Mail", "events": [
+            {"messageId": "9", "statusType": "Outage", "message": "Users are unable to send mail.", "eventStatus": "ongoing",
+             "epochStartDate": int(now * 1000) - 600000},
+            {"messageId": "8", "statusType": "Maintenance", "message": "Planned.", "eventStatus": "ongoing", "epochStartDate": int(now * 1000)}]},
+            {"serviceName": "App Store", "events": [{"messageId": "7", "statusType": "Issue", "message": "Fixed.", "eventStatus": "resolved",
+                                                     "epochStartDate": int(now * 1000)}]}]}
+        [inc] = g.open_incidents({"name": "Apple", "page": "https://www.apple.com/support/systemstatus/", "format": "apple"}, apple)
+        self.assertEqual((inc["service"], inc["title"], inc["id"]), ("iCloud Mail", "iCloud Mail outage", "Apple:9"))   # searched by product
+        paypal = {"result": [{"id": 3, "displayName": "Online Checkout", "status": {"production": "Degraded Performance"}},
+                             {"id": 4, "displayName": "Retail Checkout", "status": {"production": "Operational"}}]}
+        [inc] = g.open_incidents({"name": "PayPal", "page": "https://www.paypal-status.com", "format": "paypal"}, paypal)
+        self.assertEqual(inc["title"], "Online Checkout: Degraded Performance")
+        rss = ("<rss><channel><item><title>Azure Front Door - Mitigated</title><description>&lt;p&gt;Customers may see errors.&lt;/p&gt;</description>"
+               "<pubDate>Wed, 28 Oct 2026 01:00:00 Z</pubDate><link>https://azure.status.microsoft/x</link><guid>a1</guid></item></channel></rss>")
+        [inc] = g.open_incidents({"name": "Microsoft Azure", "page": "https://azure.status.microsoft/en-us/status/", "format": "rss"}, rss)
+        self.assertEqual((inc["title"], inc["update"], inc["since"][:16]), ("Azure Front Door - Mitigated", "Customers may see errors.", "2026-10-28T01:00"))
+        self.assertEqual(g.open_incidents({"name": "Microsoft Azure", "page": "p", "format": "rss"}, "<rss><channel></channel></rss>"), [])
+
+    def test_noise_gate(self):
+        inc = {"impact": "minor", "since": "2026-10-28T13:00:00Z"}
+        self.assertTrue(g.worth_a_poem({"name": "GitHub"}, inc, NOW))
+        self.assertFalse(g.worth_a_poem({"name": "Twilio", "min_impact": "major"}, inc, NOW))          # carrier hiccups
+        self.assertTrue(g.worth_a_poem({"name": "Twilio", "min_impact": "major"}, dict(inc, impact="critical"), NOW))
+        self.assertFalse(g.worth_a_poem({"name": "GitHub"}, dict(inc, since="2026-10-25T13:00:00Z"), NOW))  # open for days: old news
+
+
 class Verse(unittest.TestCase):
     def setUp(self):
         self.inc = g.open_incidents(GITHUB, STATUSPAGE)[0]
