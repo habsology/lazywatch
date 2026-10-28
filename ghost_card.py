@@ -52,8 +52,9 @@ body{{background:#12102A;color:#F5F7FF;font-family:SG;position:relative}}
 .tag{{position:absolute;left:80px;top:76px;right:80px;display:flex;gap:14px;align-items:center;
   font:500 21px SG;letter-spacing:.12em;color:{ink};text-transform:uppercase;white-space:nowrap;overflow:hidden}}
 .dot{{flex:none;width:14px;height:14px;border-radius:50%;background:{ink};box-shadow:0 0 18px {ink}}}
-h1{{position:absolute;left:80px;top:124px;width:920px;font:700 68px/1.04 SG;letter-spacing:-0.04em}}
-.sub{{position:absolute;left:80px;top:212px;width:920px;font:500 26px/1.2 SG;color:#B9B6D6}}
+h1{{position:absolute;left:80px;top:124px;width:920px;font:700 68px/1.04 SG;letter-spacing:-0.04em;white-space:nowrap}}
+.sub{{position:absolute;left:80px;top:212px;width:920px;font:500 26px/1.2 SG;color:#B9B6D6;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}}
 .poem{{position:absolute;left:80px;top:268px;width:920px;height:520px;font:400 60px/1.22 IS;overflow:hidden;white-space:nowrap}}
 .quote{{position:absolute;left:80px;bottom:196px;width:920px;font:400 29px/1.3 IS;color:#B9B6D6;
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}}
@@ -67,10 +68,10 @@ h1{{position:absolute;left:80px;top:124px;width:920px;font:700 68px/1.04 SG;lett
   text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
 </style><div class="sky"></div>
 <div class="tag" id="tag"><div class="dot"></div><span>{_e(spec.get("tag", "The Downtime Ghost"))}</span></div>
-<h1>{_e(spec.get("headline", ""))}</h1>
-<div class="sub">{_e(spec.get("sub", ""))}</div>
+<h1 id="head">{_e(spec.get("headline", ""))}</h1>
+<div class="sub" id="sub">{_e(spec.get("sub", ""))}</div>
 <div class="poem" id="poem">{poem}</div>
-<div class="quote">{"&#8220;" + quote + "&#8221;" if quote else ""}</div>
+<div class="quote" id="quote">{"&#8220;" + quote + "&#8221;" if quote else ""}</div>
 <div class="ghost"><i class="l"></i><i class="r"></i><b></b><b></b><b></b></div><div class="lamp"></div>
 <div class="src">{_e(spec.get("source", ""))}</div>"""
 
@@ -79,7 +80,16 @@ FIT_JS = """() => {
   const t = document.getElementById('tag');                                      // the top line never clips
   let ts = 21;
   while (ts > 13 && t.scrollWidth > t.clientWidth) { ts -= 1; t.style.fontSize = ts + 'px'; }
-  const p = document.getElementById('poem');
+  const h = document.getElementById('head');                                     // the headline stays on one line,
+  let hs = 68;                                                                   // and wraps only when it is very long
+  while (hs > 46 && h.scrollWidth > h.clientWidth) { hs -= 2; h.style.fontSize = hs + 'px'; }
+  if (h.scrollWidth > h.clientWidth) { h.style.whiteSpace = 'normal'; }
+  const s = document.getElementById('sub'), q = document.getElementById('quote');
+  const p = document.getElementById('poem');                                     // each block starts below the one above
+  s.style.top = (h.offsetTop + h.offsetHeight + 14) + 'px';
+  p.style.top = (s.offsetTop + s.offsetHeight + (s.textContent.trim() ? 30 : 0)) + 'px';
+  const floor = q.textContent.trim() ? q.offsetTop - 36 : q.offsetTop + q.offsetHeight - 20;
+  p.style.height = Math.max(200, floor - p.offsetTop) + 'px';
   const over = () => p.scrollHeight > p.clientHeight || p.scrollWidth > p.clientWidth;
   let size = 60;
   while (size > 34 && over()) { size -= 2; p.style.fontSize = size + 'px'; }   // first: no line may wrap
