@@ -271,6 +271,16 @@ class Haunting(unittest.TestCase):
         tomorrow = datetime(2026, 10, 29, 0, 5, tzinfo=timezone.utc)
         self.assertEqual(self.run_pass(feeds, now=tomorrow)["posted"], 3)   # next day: the rest go out
 
+    def test_thursday_keeps_room_for_the_graves(self):
+        many = {"incidents": [dict(STATUSPAGE["incidents"][0], id=f"i{n}", name=f"Incident {n}") for n in range(15)]}
+        feeds = {"GitHub": many, "Slack": {"active_incidents": []}, "Google Cloud": []}
+        thursday = datetime(2026, 10, 29, 9, 0, tzinfo=timezone.utc)
+        self.assertEqual(self.run_pass(feeds, now=thursday)["posted"], g.MAX_POSTS_PER_DAY - g.GRAVES_ON_THURSDAY)
+        saturday = datetime(2026, 10, 31, 9, 0, tzinfo=timezone.utc)
+        self.assertEqual(g.reserved(self.tmp, saturday), 1)                 # one for the ofrenda, until it is offered
+        g._log(self.tmp, {"when": saturday.isoformat(), "kind": "ofrenda", "uri": "at://x/o"})
+        self.assertEqual(g.reserved(self.tmp, saturday), 0)
+
     def test_model_failures_retry_then_give_up(self):
         feeds = {"GitHub": STATUSPAGE, "Slack": {"active_incidents": []}, "Google Cloud": []}
 

@@ -110,14 +110,18 @@ jobs:
             if [ "${done_:-0}" -ge 6 ]; then
               echo "six graves already visited today"
             else
-              python lazywatch_ghost.py throwback --count 1 --out out && echo "$today $(( ${done_:-0} + 1 ))" > state/ghost/throwback-day
+              if python lazywatch_ghost.py throwback --count 1 --out out; then
+                echo "$today $(( ${done_:-0} + 1 ))" > state/ghost/throwback-day
+              else
+                echo "no grave visited this run"
+              fi
             fi
           }
           ofrenda_once() {
             if [ "$(cat state/ghost/ofrenda-day 2>/dev/null)" = "$today" ]; then
               echo "ofrenda already offered today"
             else
-              python lazywatch_ghost.py ofrenda --out out && echo "$today" > state/ghost/ofrenda-day
+              if python lazywatch_ghost.py ofrenda --out out; then echo "$today" > state/ghost/ofrenda-day; else echo "no ofrenda this run"; fi
             fi
           }
           case "$MODE" in

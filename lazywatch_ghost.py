@@ -688,6 +688,21 @@ def posted_today(state, now):
     return sum(1 for p in posts(state) if p.get("when", "").startswith(day) and p.get("uri"))
 
 
+GRAVES_ON_THURSDAY = 6
+
+
+def reserved(state, now):
+    """Posts held back from the hauntings so a busy outage day cannot crowd out the scheduled ones: the rest of
+    Thursday's graves, and Saturday's ofrenda until it is offered. They still count toward the daily cap."""
+    day = now.strftime("%Y-%m-%d")
+    today = [p for p in posts(state) if p.get("when", "").startswith(day) and p.get("uri")]
+    if now.isoweekday() == 4:
+        return max(0, GRAVES_ON_THURSDAY - sum(1 for p in today if p.get("kind") == "throwback"))
+    if now.isoweekday() == 6:
+        return 0 if any(p.get("kind") == "ofrenda" for p in today) else 1
+    return 0
+
+
 def haunt(sites, state, ask=ask_ghost, poster=None, fetch=fetch_feed, shooter=screenshot, cards=render_card,
           now=None, dry_run=False, out_dir=None, seen_live=None):
     """One pass over every status feed: new incidents get verse, cleared incidents get a resurrection notice.
@@ -698,7 +713,7 @@ def haunt(sites, state, ask=ask_ghost, poster=None, fetch=fetch_feed, shooter=sc
     poster = poster or (print_poster if dry_run else BlueskyPoster())
     seen_live = seen_live or (LiveFeedCheck() if live else (lambda key: False))
     seen = load_state(state)
-    budget = MAX_POSTS_PER_DAY - posted_today(state, now)
+    budget = MAX_POSTS_PER_DAY - posted_today(state, now) - reserved(state, now)
     report = {"checked": 0, "failed": [], "open": 0, "posted": 0, "skipped": 0}
 
     for site in sites:
@@ -1104,11 +1119,11 @@ def main(argv=None):
         sites = json.loads(Path(args.graves).read_text())
         n = throwback(sites, args.state, dry_run=dry, count=args.count, out_dir=args.out)
         print(f"{n} graves visited" + (" (dry run)" if dry else ""))
-        return 0
+        return 0 if n or dry else 3                      # nothing visited: the workflow does not count this run
     if args.command == "ofrenda":
         n = ofrenda(args.state, dry_run=dry, out_dir=args.out)
         print(("ofrenda posted" if n else "no ofrenda") + (" (dry run)" if dry else ""))
-        return 0
+        return 0 if n or dry else 3                      # not offered: the next run tries again
     sites = json.loads(Path(args.config).read_text())
     if args.only:
         sites = [s for s in sites if s["name"].lower() == args.only.lower()]
