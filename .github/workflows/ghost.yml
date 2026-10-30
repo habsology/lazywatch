@@ -104,13 +104,18 @@ jobs:
           # when GitHub honours it, else the first haunt after 14:00 UTC. The marker travels with the state.
           today=$(date -u +%F)
           # Thursdays: one grave per hourly run from 14:00 UTC (10 am Montreal), six in all, so the day has a steady drip.
+          # Other days with graves (a holiday, a make-up day) are listed in special_days.json, with their own count and header.
+          special_graves=$(python -c "import json,sys; print(json.load(open('special_days.json')).get(sys.argv[1], {}).get('graves', 0))" "$today" 2>/dev/null || echo 0)
+          special_occasion=$(python -c "import json,sys; print(json.load(open('special_days.json')).get(sys.argv[1], {}).get('occasion', 'Throwback Thursday'))" "$today" 2>/dev/null || echo "Throwback Thursday")
           throwback_once() {
+            limit=${1:-6}
+            occasion=${2:-Throwback Thursday}
             read -r day done_ < state/ghost/throwback-day 2>/dev/null || true
             [ "$day" = "$today" ] || done_=0
-            if [ "${done_:-0}" -ge 6 ]; then
-              echo "six graves already visited today"
+            if [ "${done_:-0}" -ge "$limit" ]; then
+              echo "$limit graves already visited today"
             else
-              if python lazywatch_ghost.py throwback --count 1 --out out; then
+              if python lazywatch_ghost.py throwback --count 1 --occasion "$occasion" --out out; then
                 echo "$today $(( ${done_:-0} + 1 ))" > state/ghost/throwback-day
               else
                 echo "no grave visited this run"
@@ -133,6 +138,7 @@ jobs:
             ofrenda-dry-run)   python lazywatch_ghost.py ofrenda --dry-run --out out ;;
             *)                 python lazywatch_ghost.py --out out
                                if [ "$(date -u +%u)" = 4 ] && [ "$(date -u +%H)" -ge 14 ]; then throwback_once; fi
+                               if [ "$special_graves" -gt 0 ] && [ "$(date -u +%H)" -ge 14 ]; then throwback_once "$special_graves" "$special_occasion"; fi
                                if [ "$(date -u +%u)" = 6 ] && [ "$(date -u +%H)" -ge 15 ]; then ofrenda_once; fi ;;
           esac
           python lazywatch_ghost.py graveyard

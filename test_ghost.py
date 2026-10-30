@@ -1,6 +1,7 @@
 import json
 import tempfile
 import unittest
+import unittest.mock
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -280,6 +281,10 @@ class Haunting(unittest.TestCase):
         self.assertEqual(g.reserved(self.tmp, saturday), 1)                 # one for the ofrenda, until it is offered
         g._log(self.tmp, {"when": saturday.isoformat(), "kind": "ofrenda", "uri": "at://x/o"})
         self.assertEqual(g.reserved(self.tmp, saturday), 0)
+        special = Path(self.tmp) / "special_days.json"
+        special.write_text('{"2026-10-31": {"graves": 3, "occasion": "Día de los Muertos"}}')
+        with unittest.mock.patch.object(g, "SPECIAL_DAYS", special):
+            self.assertEqual(g.reserved(self.tmp, saturday), 3)            # a make-up day keeps room for its graves too
 
     def test_model_failures_retry_then_give_up(self):
         feeds = {"GitHub": STATUSPAGE, "Slack": {"active_incidents": []}, "Google Cloud": []}

@@ -508,7 +508,7 @@ def card_spec(kind, incident=None, form=None, poem="", quote="", entry=None, ser
         return {"kind": kind, "tag": f"The Downtime Ghost · Ofrenda · week of {week}", "headline": "Ofrenda",
                 "sub": "The week's fallen services, and their time in the underworld", "poem": poem, "quote": quote,
                 "source": "Source: the official status pages"}
-    return {"kind": "throwback", "tag": f"Throwback Thursday · from the Wayback Machine · {site['born']} to {site['died']}",
+    return {"kind": "throwback", "tag": f"{site.get('occasion', 'Throwback Thursday')} · from the Wayback Machine · {site['born']} to {site['died']}",
             "headline": f"In memoriam: {site['name']}", "sub": site.get("seen", ""),
             "poem": poem, "quote": quote, "source": "Source: web.archive.org"}
 
@@ -689,6 +689,15 @@ def posted_today(state, now):
 
 
 GRAVES_ON_THURSDAY = 6
+SPECIAL_DAYS = Path(__file__).with_name("special_days.json")   # {"YYYY-MM-DD": {"graves": 3, "occasion": "..."}}
+
+
+def special_day(now):
+    """Graves on a day other than Thursday (a holiday, a make-up day), from special_days.json; {} on an ordinary day."""
+    try:
+        return json.loads(SPECIAL_DAYS.read_text()).get(now.strftime("%Y-%m-%d"), {})
+    except (OSError, ValueError):
+        return {}
 
 
 def reserved(state, now):
@@ -696,11 +705,11 @@ def reserved(state, now):
     Thursday's graves, and Saturday's ofrenda until it is offered. They still count toward the daily cap."""
     day = now.strftime("%Y-%m-%d")
     today = [p for p in posts(state) if p.get("when", "").startswith(day) and p.get("uri")]
-    if now.isoweekday() == 4:
-        return max(0, GRAVES_ON_THURSDAY - sum(1 for p in today if p.get("kind") == "throwback"))
-    if now.isoweekday() == 6:
-        return 0 if any(p.get("kind") == "ofrenda" for p in today) else 1
-    return 0
+    graves = GRAVES_ON_THURSDAY if now.isoweekday() == 4 else special_day(now).get("graves", 0)
+    held = max(0, graves - sum(1 for p in today if p.get("kind") == "throwback"))
+    if now.isoweekday() == 6 and not any(p.get("kind") == "ofrenda" for p in today):
+        held += 1
+    return held
 
 
 def haunt(sites, state, ask=ask_ghost, poster=None, fetch=fetch_feed, shooter=screenshot, cards=render_card,
@@ -841,10 +850,10 @@ def wayback(site, fetch_json=None, fetch_html=None):
     return url, [p for p in paragraphs if len(p) >= 30 and about_the_site(p, site["name"])][:40], seen
 
 
-def throwback_prompt(site, paragraphs):
+def throwback_prompt(site, paragraphs, occasion="Throwback Thursday"):
     text = "\n".join(f"- {p[:300]}" for p in paragraphs[:25])
     return (
-        "You are The Downtime Ghost, a theatrical but kind spirit. Tonight is Throwback Thursday and you are "
+        f"You are The Downtime Ghost, a theatrical but kind spirit. Tonight is {occasion} and you are "
         f"visiting the grave of {site['name']} ({site['born']} to {site['died']}): {site.get('note', '')}.\n"
         f"WHAT ITS ARCHIVED HOME PAGE SAID:\n{text}\n\n"
         f"Write an elegy for {site['name']}: 6 to 10 short lines, one line per line, fond and a little funny, "
@@ -856,7 +865,7 @@ def throwback_prompt(site, paragraphs):
 
 
 def throwback(sites, state, ask=ask_model, poster=None, lookup=wayback, cards=render_card, now=None, dry_run=False,
-              count=3, out_dir=None, seen_live=None, shooter=None):
+              count=3, out_dir=None, seen_live=None, shooter=None, occasion="Throwback Thursday"):
     """Three graves a Thursday: the next unvisited sites in throwback.json, each with an elegy from its last words."""
     now = now or datetime.now(timezone.utc)
     live = poster is None and not dry_run          # posting to the real account: read its feed first
@@ -884,7 +893,7 @@ def throwback(sites, state, ask=ask_model, poster=None, lookup=wayback, cards=re
             print(f"{site['name']}: the saved page has no words", file=sys.stderr)
             continue
         try:
-            reply = ask(throwback_prompt(site, paragraphs))
+            reply = ask(throwback_prompt(site, paragraphs, occasion))
         except Exception as exc:
             print(f"{site['name']}: model unavailable ({exc.__class__.__name__})", file=sys.stderr)
             break
@@ -895,9 +904,9 @@ def throwback(sites, state, ask=ask_model, poster=None, lookup=wayback, cards=re
         quote, verified = verify_quote(reply, " ".join(paragraphs), site["name"])
         if newsy(quote):
             quote, verified = site["name"], False
-        spec = card_spec("throwback", poem=poem, quote=quote, site=dict(site, seen=seen))
+        spec = card_spec("throwback", poem=poem, quote=quote, site=dict(site, seen=seen, occasion=occasion))
         card = cards(spec, out_dir, f"throwback-{_slug(site['name'])}") if cards else None
-        header = f"\U0001F56F️ Throwback Thursday: in memoriam {site['name']} ({site['born']} to {site['died']})"
+        header = f"\U0001F56F️ {occasion}: in memoriam {site['name']} ({site['born']} to {site['died']})"
         posts_ = thread(header, [l for l in poem.splitlines() if l.strip()], quote, ("web.archive.org", url),
                         [card] if card else None)
         posts_.append(grave_post(site, url, seen, shooter(_as_it_was(url), site["name"]) if shooter else None))
@@ -1106,6 +1115,7 @@ def main(argv=None):
     ap.add_argument("--state", default="state")
     ap.add_argument("--only", help="run one service by name")
     ap.add_argument("--count", type=int, default=3, help="graves to visit (throwback)")
+    ap.add_argument("--occasion", default="Throwback Thursday", help="the graves' header and card label (throwback)")
     ap.add_argument("--out", help="folder for the rendered cards")
     ap.add_argument("--dry-run", action="store_true", help="write the verse, post nothing, change nothing")
     args = ap.parse_args(argv)
@@ -1117,7 +1127,8 @@ def main(argv=None):
         print("BLUESKY_APP_PASSWORD not set: dry run", file=sys.stderr)
     if args.command == "throwback":
         sites = json.loads(Path(args.graves).read_text())
-        n = throwback(sites, args.state, dry_run=dry, count=args.count, out_dir=args.out)
+        n = throwback(sites, args.state, dry_run=dry, count=args.count, out_dir=args.out,
+                      occasion=args.occasion)
         print(f"{n} graves visited" + (" (dry run)" if dry else ""))
         return 0 if n or dry else 3                      # nothing visited: the workflow does not count this run
     if args.command == "ofrenda":
