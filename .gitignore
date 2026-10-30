@@ -5,3 +5,10 @@ sites.json
 lazywatch.db*
 __pycache__/
 *.pyc
+ghost-demo-output/
+ghost-demo-output.zip
+ghost.db*
+temporal.exe
+temporal.zip
+temporal-cli/
+out/
