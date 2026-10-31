@@ -5,7 +5,7 @@ name: Downtime Ghost
 on:
   schedule:
     - cron: "17,47 * * * *"  # twice an hour: the status feeds (GitHub drops scheduled runs near the top of the hour under load)
-    - cron: "33 14 * * 4"    # Thursday 14:33 UTC (10:33 am Montreal): Throwback Thursday, three graves
+    - cron: "33 14 * * 4"    # Thursday 14:33 UTC (10:33 am Montreal): Throwback Thursday, the first of six graves
   workflow_dispatch:
     inputs:
       mode:
