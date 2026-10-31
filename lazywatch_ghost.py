@@ -926,7 +926,11 @@ def throwback(sites, state, ask=ask_model, poster=None, lookup=wayback, cards=re
         header = f"\U0001F56F️ {occasion}: in memoriam {site['name']} ({site['born']} to {site['died']})"
         posts_ = thread(header, [l for l in poem.splitlines() if l.strip()], quote, ("web.archive.org", url),
                         [card] if card else None)
-        posts_.append(grave_post(site, url, seen, shooter(_as_it_was(url), site["name"]) if shooter else None))
+        shot = shooter(_as_it_was(url), site["name"]) if shooter else None
+        if shot and out_dir:                                                  # kept with the cards, so a dry run shows it
+            Path(out_dir).mkdir(parents=True, exist_ok=True)
+            (Path(out_dir) / f"grave-shot-{_slug(site['name'])}.jpg").write_bytes(shot["data"])
+        posts_.append(grave_post(site, url, seen, shot))
         try:
             uris = poster(posts_)
         except Exception as exc:
@@ -947,8 +951,10 @@ def throwback(sites, state, ask=ask_model, poster=None, lookup=wayback, cards=re
 
 
 def _as_it_was(url):
-    """The archived page without the Wayback toolbar (id_ after the timestamp)."""
-    return re.sub(r"(/web/\d{8,14})/", r"\1id_/", url, count=1)
+    """The archived page without the Wayback toolbar, for the screenshot: if_ after the timestamp keeps the archive's
+    rewritten links, so the page's images and styles load from the archive too. (id_ is the raw page: right for
+    reading its text, but its images point at hosts that died with the site, so it renders as a broken page.)"""
+    return re.sub(r"(/web/\d{8,14})/", r"\1if_/", url, count=1)
 
 
 def grave_post(site, url, seen, shot=None):

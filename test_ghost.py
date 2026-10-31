@@ -510,7 +510,7 @@ class Throwback(unittest.TestCase):
         g.throwback(self.SITES, self.tmp, ask=lambda p: self.ELEGY, poster=self.poster, lookup=self.lookup,
                     cards=FAKE_CARD, now=NOW, count=1, shooter=shooter)
         last = self.threads[0][-1]
-        self.assertEqual(shots[0], "https://web.archive.org/web/20090601id_/http://www.geocities.com/")   # no Wayback toolbar
+        self.assertEqual(shots[0], "https://web.archive.org/web/20090601if_/http://www.geocities.com/")   # no toolbar, images from the archive
         self.assertTrue(last["text"].startswith("GeoCities as it looked"))
         self.assertTrue(last["text"].endswith("Source: web.archive.org"))
         self.assertEqual(last["facets"][0]["features"][0]["uri"], "https://web.archive.org/web/20090601/http://www.geocities.com/")

@@ -46,6 +46,12 @@ def screenshot(url, settle_ms=3000, width=1200, height=800):
             page = browser.contexts[0].pages[0]
             page.set_viewport_size({"width": width, "height": height})
             page.goto(url, wait_until="domcontentloaded", timeout=45_000)
+            if "web.archive.org/" in url:              # archived images come one by one from the archive: give them time
+                try:
+                    page.wait_for_load_state("load", timeout=30_000)
+                except Exception:
+                    pass
+                settle_ms = max(settle_ms, 5000)
             page.wait_for_timeout(settle_ms)
             return page.screenshot(type="jpeg", quality=80)
         finally:
