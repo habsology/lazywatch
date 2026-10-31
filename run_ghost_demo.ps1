@@ -46,17 +46,15 @@ ollama pull gemma3:4b
 
 Step "Getting the Temporal CLI (one file, open source)"
 if (-not (Test-Path .\temporal.exe)) {
-    if (-not (Test-Path .\temporal.exe)) {
-        try {
-            Invoke-WebRequest "https://temporal.download/cli/archive/latest?platform=windows&arch=amd64&format=zip" -OutFile temporal.zip
-            Expand-Archive temporal.zip -DestinationPath temporal-cli -Force
-            Copy-Item (Get-ChildItem temporal-cli -Recurse -Filter temporal.exe | Select-Object -First 1).FullName .\temporal.exe
-        } catch {
-            Warn "download failed: $_"
-            Write-Host "Get temporal_cli_<version>_windows_amd64.zip from https://github.com/temporalio/cli/releases, put temporal.exe in this folder, run this script again."
-            Stop-Transcript | Out-Null
-            exit 1
-        }
+    try {
+        Invoke-WebRequest "https://temporal.download/cli/archive/latest?platform=windows&arch=amd64&format=zip" -OutFile temporal.zip
+        Expand-Archive temporal.zip -DestinationPath temporal-cli -Force
+        Copy-Item (Get-ChildItem temporal-cli -Recurse -Filter temporal.exe | Select-Object -First 1).FullName .\temporal.exe
+    } catch {
+        Warn "download failed: $_"
+        Write-Host "Get temporal_cli_<version>_windows_amd64.zip from https://github.com/temporalio/cli/releases, put temporal.exe in this folder, run this script again."
+        Stop-Transcript | Out-Null
+        exit 1
     }
 }
 

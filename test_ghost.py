@@ -277,13 +277,14 @@ class Haunting(unittest.TestCase):
         feeds = {"GitHub": many, "Slack": {"active_incidents": []}, "Google Cloud": []}
         thursday = datetime(2026, 10, 29, 9, 0, tzinfo=timezone.utc)
         self.assertEqual(self.run_pass(feeds, now=thursday)["posted"], g.MAX_POSTS_PER_DAY - g.GRAVES_ON_THURSDAY)
-        saturday = datetime(2026, 10, 31, 9, 0, tzinfo=timezone.utc)
-        self.assertEqual(g.reserved(self.tmp, saturday), 1)                 # one for the ofrenda, until it is offered
-        g._log(self.tmp, {"when": saturday.isoformat(), "kind": "ofrenda", "uri": "at://x/o"})
-        self.assertEqual(g.reserved(self.tmp, saturday), 0)
+        saturday = datetime(2026, 11, 7, 9, 0, tzinfo=timezone.utc)      # a plain Saturday, not one in special_days.json
         special = Path(self.tmp) / "special_days.json"
-        special.write_text('{"2026-10-31": {"graves": 3, "occasion": "Día de los Muertos"}}')
+        special.write_text("{}")
         with unittest.mock.patch.object(g, "SPECIAL_DAYS", special):
+            self.assertEqual(g.reserved(self.tmp, saturday), 1)             # one for the ofrenda, until it is offered
+            g._log(self.tmp, {"when": saturday.isoformat(), "kind": "ofrenda", "uri": "at://x/o"})
+            self.assertEqual(g.reserved(self.tmp, saturday), 0)
+            special.write_text('{"2026-11-07": {"graves": 3, "occasion": "Día de los Muertos"}}')
             self.assertEqual(g.reserved(self.tmp, saturday), 3)            # a make-up day keeps room for its graves too
 
     def test_model_failures_retry_then_give_up(self):
