@@ -480,6 +480,9 @@ class Throwback(unittest.TestCase):
         self.assertIn("url=http%3A%2F%2Fwww.geocities.com%2F&timestamp=20090601", calls[0])
         self.assertEqual(len(paragraphs), 1)
         self.assertEqual(seen, "Last seen December 2, 2007")
+        gone = lambda url: "<html><body><p>Sorry, the page you requested was not found.</p></body></html>"
+        with self.assertRaises(LookupError):                                  # a saved 404 is no grave to visit
+            g.wayback(self.SITES[0], fetch_json, gone)
 
     def test_newsy_quote_falls_back_to_the_name(self):
         bad = {"poem": "Neighbourhoods of text,\nwe never knew what came next.", "quote": "Investigators said Mr. Doe was charged."}

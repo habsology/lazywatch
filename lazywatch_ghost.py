@@ -851,6 +851,10 @@ def _slug(text):
 
 
 # ---------------------------------------------------------------- Throwback Thursday
+ERROR_PAGE = re.compile(r"page (you requested|you are looking for|cannot be found|not found)|\b404\b|has been (discontinued|shut down)",
+                        re.I)
+
+
 def wayback(site, fetch_json=None, fetch_html=None):
     """The closest saved copy of a dead site's home page: (snapshot url for people, page text paragraphs)."""
     fetch_json = fetch_json or (lambda url: json.loads(lazywatch.fetch(url)))
@@ -862,6 +866,8 @@ def wayback(site, fetch_json=None, fetch_html=None):
     url = closest["url"].replace("http://web.archive.org/", "https://web.archive.org/")
     raw = re.sub(r"(/web/\d{14})/", r"\1id_/", url, count=1)           # id_ = the page as it was, no archive toolbar
     paragraphs = lazywatch.paragraphs(fetch_html(raw))
+    if any(ERROR_PAGE.search(p) for p in paragraphs[:20]):                 # the saved copy is the site's own 404 or exit page
+        raise LookupError("the snapshot is an error page")
     stamp = closest.get("timestamp", "")
     seen = f"Last seen {datetime.strptime(stamp[:8], '%Y%m%d').strftime('%B %-d, %Y')}" if len(stamp) >= 8 else ""
     return url, [p for p in paragraphs if len(p) >= 30 and about_the_site(p, site["name"])][:40], seen
