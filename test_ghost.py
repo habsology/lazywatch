@@ -272,6 +272,23 @@ class Haunting(unittest.TestCase):
         tomorrow = datetime(2026, 10, 29, 0, 5, tzinfo=timezone.utc)
         self.assertEqual(self.run_pass(feeds, now=tomorrow)["posted"], 3)   # next day: the rest go out
 
+    def test_resurrection_held_by_the_cap_posts_later_with_its_real_time(self):
+        feeds = {"GitHub": STATUSPAGE, "Slack": {"active_incidents": []}, "Google Cloud": []}
+        self.run_pass(feeds)
+        for n in range(g.MAX_POSTS_PER_DAY):                                 # the rest of the day's posts are spent
+            g._log(self.tmp, {"when": NOW.isoformat(), "kind": "haunting", "service": "X", "id": f"x{n}", "uri": f"at://x/{n}"})
+        feeds["GitHub"] = {"incidents": []}
+        r = self.run_pass(feeds)
+        self.assertEqual((r["posted"], r["skipped"]), (0, 1))
+        held = g.load_state(self.tmp)["GitHub"]["GitHub:abc1"]
+        self.assertEqual(held["risen_at"], NOW.isoformat())                  # kept, with the time it cleared
+        self.assertNotIn("Still haunted", g.graveyard(self.tmp))
+        tomorrow = datetime(2026, 10, 29, 0, 5, tzinfo=timezone.utc)
+        self.assertEqual(self.run_pass(feeds, now=tomorrow)["posted"], 1)
+        self.assertIn(f"back up after {g._duration(held['since'], NOW)}.", self.threads[-1][0]["text"])   # to when it cleared, not to the post
+        self.assertEqual(g.load_state(self.tmp)["GitHub"], {})
+        self.assertEqual(g.posts(self.tmp)[-1]["risen_at"], NOW.isoformat())
+
     def test_thursday_keeps_room_for_the_graves(self):
         many = {"incidents": [dict(STATUSPAGE["incidents"][0], id=f"i{n}", name=f"Incident {n}") for n in range(15)]}
         feeds = {"GitHub": many, "Slack": {"active_incidents": []}, "Google Cloud": []}
@@ -371,6 +388,8 @@ class Ofrenda(unittest.TestCase):
         ]
         for r in rows:
             g._log(self.tmp, r)
+        g.save_state(self.tmp, {"DigitalOcean": {"DigitalOcean:d1": {"service": "DigitalOcean", "title": "Kubernetes",
+                                                                       "posted": {"uri": "at://x/3"}}}})   # still on its page
         self.threads = []
 
     def poster(self, posts):
@@ -390,6 +409,13 @@ class Ofrenda(unittest.TestCase):
         many = [(f"Service{n}", {"n": 1, "minutes": 60 + n, "open": False}) for n in range(40)]
         self.assertLessEqual(len(g.ofrenda_text("Nov 1 to 7", many, 3000)), 300)
         self.assertIn(" more.", g.ofrenda_text("Nov 1 to 7", many, 3000))
+
+    def test_cleared_without_a_resurrection_is_not_still_haunted(self):
+        g._log(self.tmp, {"when": "2026-10-30T10:00:00Z", "kind": "haunting", "service": "OpenAI", "id": "OpenAI:o1",
+                          "title": "Errors", "since": "2026-10-30T09:00:00Z", "uri": "at://x/5"})   # its resurrection was lost
+        week, items, total = g.altar(g.fallen(self.tmp, self.SAT), self.SAT)
+        self.assertEqual(dict(items)["OpenAI"], {"n": 1, "minutes": 60, "open": False})          # up to its own post, not to now
+        self.assertTrue(dict(items)["DigitalOcean"]["open"])
 
     def test_posts_once_with_a_card(self):
         n = g.ofrenda(self.tmp, poster=self.poster, cards=FAKE_CARD, now=self.SAT)

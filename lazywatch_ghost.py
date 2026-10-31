@@ -742,12 +742,18 @@ def haunt(sites, state, ask=ask_ghost, poster=None, fetch=fetch_feed, shooter=sc
                              f"{len(current)} open" if current else "ok")
         entries = seen.setdefault(name, {})
 
+        for ident in current:                                                  # back on the page: not risen after all
+            if ident in entries:
+                entries[ident].pop("risen_at", None)
         for ident in [i for i in list(entries) if i not in current]:          # resolved: the resurrection
             entry = entries.pop(ident)
             if not entry.get("posted"):
                 continue
+            entry.setdefault("risen_at", now.isoformat())                      # when it cleared, even if the post waits
+            risen = _parse(entry["risen_at"]) or now
             name = entry.get("service") or site["name"]
             if budget <= 0:
+                entries[ident] = entry                                         # held by the cap: kept for the next pass
                 report["skipped"] += 1
                 continue
             if seen_live(resurrection_key(name, entry)):
@@ -756,8 +762,8 @@ def haunt(sites, state, ask=ask_ghost, poster=None, fetch=fetch_feed, shooter=sc
                     _log(state, {"when": now.isoformat(), "kind": "duplicate-skipped", "service": name, "id": ident,
                                  "title": entry["title"], "key": resurrection_key(name, entry)})
                 continue
-            card = cards(card_spec("risen", entry=entry, service=name, now=now), out_dir, f"risen-{_slug(ident)}") if cards else None
-            posts_ = resurrection_thread(name, entry, now, [card] if card else None)
+            card = cards(card_spec("risen", entry=entry, service=name, now=risen), out_dir, f"risen-{_slug(ident)}") if cards else None
+            posts_ = resurrection_thread(name, entry, risen, [card] if card else None)
             try:
                 uris = poster(posts_)
             except Exception as exc:
@@ -769,6 +775,7 @@ def haunt(sites, state, ask=ask_ghost, poster=None, fetch=fetch_feed, shooter=sc
             if not dry_run:
                 _log(state, {"when": now.isoformat(), "kind": "resurrection", "service": name, "id": ident,
                              "title": entry["title"], "since": entry.get("since") or entry["first_seen"],
+                             "risen_at": entry["risen_at"],
                              "key": resurrection_key(name, entry), "text": posts_[0]["text"],
                              "uri": uris[0]})
 
@@ -1006,7 +1013,7 @@ def graveyard(state):
            f"{verified} quotes verified word for word."]
     for service, n in sorted(by_service.items(), key=lambda kv: (-kv[1], kv[0])):
         out.append(f"  {service}: {n}")
-    still = {k: v for s in load_state(state).values() for k, v in s.items() if v.get("posted")}
+    still = {k: v for s in load_state(state).values() for k, v in s.items() if v.get("posted") and not v.get("risen_at")}
     if still:
         out.append("Still haunted: " + ", ".join(sorted(k.split(":")[0] for k in still)))
     return "\n".join(out)
@@ -1021,22 +1028,31 @@ def _span(minutes):
 
 
 def fallen(state, now, days=7):
-    """The week's hauntings from the ghost's own log: who fell, since when, risen when (or still haunted)."""
+    """The week's hauntings from the ghost's own log: who fell, since when, risen when (or still haunted).
+    Still haunted means still on its status page now (the open state), never just "no resurrection in the log":
+    a haunting that cleared with no resurrection logged counts only the time up to its own post, a known minimum."""
     start = now - timedelta(days=days)
     rows = posts(state)
-    risen = {(r.get("service"), r.get("id")): r["when"] for r in rows if r.get("kind") == "resurrection" and r.get("uri")}
+    risen = {(r.get("service"), r.get("id")): r.get("risen_at") or r["when"]
+             for r in rows if r.get("kind") == "resurrection" and r.get("uri")}
+    current = {(v.get("service") or site, ident): v for site, s in load_state(state).items()
+               for ident, v in s.items() if v.get("posted")}
     out = []
     for r in rows:
         if r.get("kind") != "haunting" or not r.get("uri"):
             continue
-        up = risen.get((r.get("service"), r.get("id")))
+        key = (r.get("service"), r.get("id"))
+        held = current.get(key)
+        up = risen.get(key) or (held or {}).get("risen_at")
+        still = held is not None and not up
         posted, back = _parse(r.get("when")), _parse(up) if up else None
-        if not posted or (posted < start and not (back and back >= start)):
+        if not posted or (posted < start and not (still or (back and back >= start))):
             continue
         since = _parse(r.get("since")) or posted
-        minutes = max(int(((back or now) - since).total_seconds() // 60), 0)
+        end = back or (now if still else posted)
+        minutes = max(int((end - since).total_seconds() // 60), 0)
         out.append({"service": r["service"], "title": r.get("title", ""), "since": since.isoformat(),
-                    "risen": up, "minutes": minutes})
+                    "risen": up, "open": still, "minutes": minutes})
     return out
 
 
@@ -1049,7 +1065,7 @@ def altar(rows, now, days=7):
         b = by.setdefault(f["service"], {"n": 0, "minutes": 0, "open": False})
         b["n"] += 1
         b["minutes"] += f["minutes"]
-        b["open"] = b["open"] or not f["risen"]
+        b["open"] = b["open"] or f.get("open", not f["risen"])
     items = sorted(by.items(), key=lambda kv: (-kv[1]["minutes"], kv[0]))
     return week, items, sum(b["minutes"] for _, b in items)
 
