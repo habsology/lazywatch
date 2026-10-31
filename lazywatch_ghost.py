@@ -628,6 +628,12 @@ def bsky_post(session, post, reply_to=None, now=None):
     return {"uri": r["uri"], "cid": r["cid"]}
 
 
+def bsky_delete(session, uri):
+    """Takes down one of the account's own posts, by its at:// uri."""
+    repo, collection, rkey = uri.removeprefix("at://").split("/")
+    _xrpc("com.atproto.repo.deleteRecord", {"repo": repo, "collection": collection, "rkey": rkey}, session["jwt"])
+
+
 class BlueskyPoster:
     """Posts a thread for real: the first post, then each next one as a reply to the previous. Logs in once."""
     def __init__(self):
@@ -643,6 +649,10 @@ class BlueskyPoster:
             parent = ref
             uris.append(ref["uri"])
         return uris
+
+    def delete(self, uri):
+        self.session = self.session or bsky_login()
+        bsky_delete(self.session, uri)
 
 
 def print_poster(posts):
@@ -1094,19 +1104,39 @@ def ofrenda_text(week, items, total):
     return _shorten(build(1), POST_LIMIT)
 
 
-def ofrenda(state, poster=None, cards=render_card, now=None, dry_run=False, out_dir=None, seen_live=None, days=7):
-    """Saturday: the week's fallen services on one amber card, with their time in the underworld. One post."""
+def ofrenda(state, poster=None, cards=render_card, now=None, dry_run=False, out_dir=None, seen_live=None, days=7,
+            redo=False, deleter=None):
+    """Saturday: the week's fallen services on one amber card, with their time in the underworld. One post.
+    redo: a correction. This week's ofrenda is taken down first and replaced, one for one, so the cap is not
+    asked again; if the old post cannot be taken down, nothing new is posted."""
     now = now or datetime.now(timezone.utc)
     live = poster is None and not dry_run
     poster = poster or (print_poster if dry_run else BlueskyPoster())
     seen_live = seen_live or (LiveFeedCheck() if live else (lambda key: False))
-    if MAX_POSTS_PER_DAY - posted_today(state, now) <= 0:
-        print("ofrenda held back by the daily cap", file=sys.stderr)
-        return 0
     week, items, total = altar(fallen(state, now, days), now, days)
-    if seen_live(ofrenda_key(week)):
-        print("ofrenda already on the feed", file=sys.stderr)
-        return 0
+    if redo:
+        gone = {r.get("uri") for r in posts(state) if r.get("kind") == "ofrenda-withdrawn"}
+        old = [r for r in posts(state) if r.get("kind") == "ofrenda" and r.get("key") == ofrenda_key(week)
+               and r.get("uri") and r["uri"] not in gone]
+        deleter = deleter or (getattr(poster, "delete", None) if not dry_run else (lambda uri: print(f"--- would delete {uri}")))
+        for r in old:
+            try:
+                deleter(r["uri"])
+            except Exception as exc:
+                print(f"old ofrenda not taken down ({exc.__class__.__name__}: {str(exc)[:80]}): posting nothing", file=sys.stderr)
+                return 0
+            if not dry_run:
+                _log(state, {"when": now.isoformat(), "kind": "ofrenda-withdrawn", "key": r["key"], "uri": r["uri"]})
+        if not old:
+            print("no ofrenda this week to correct", file=sys.stderr)
+            return 0
+    else:
+        if MAX_POSTS_PER_DAY - posted_today(state, now) <= 0:
+            print("ofrenda held back by the daily cap", file=sys.stderr)
+            return 0
+        if seen_live(ofrenda_key(week)):
+            print("ofrenda already on the feed", file=sys.stderr)
+            return 0
     text = ofrenda_text(week, items, total)
     lines = [f"{n}{' ×' + str(b['n']) if b['n'] > 1 else ''} · {_span(b['minutes'])}" + (" · still haunted" if b["open"] else "")
              for n, b in items[:MAX_LINES]] or ["Nobody fell this week."]
@@ -1134,6 +1164,7 @@ def main(argv=None):
     ap.add_argument("--occasion", default="Throwback Thursday", help="the graves' header and card label (throwback)")
     ap.add_argument("--out", help="folder for the rendered cards")
     ap.add_argument("--dry-run", action="store_true", help="write the verse, post nothing, change nothing")
+    ap.add_argument("--redo", action="store_true", help="take down this week's ofrenda and post a corrected one (ofrenda)")
     args = ap.parse_args(argv)
     if args.command == "graveyard":
         print(graveyard(args.state))
@@ -1148,7 +1179,7 @@ def main(argv=None):
         print(f"{n} graves visited" + (" (dry run)" if dry else ""))
         return 0 if n or dry else 3                      # nothing visited: the workflow does not count this run
     if args.command == "ofrenda":
-        n = ofrenda(args.state, dry_run=dry, out_dir=args.out)
+        n = ofrenda(args.state, dry_run=dry, out_dir=args.out, redo=args.redo)
         print(("ofrenda posted" if n else "no ofrenda") + (" (dry run)" if dry else ""))
         return 0 if n or dry else 3                      # not offered: the next run tries again
     sites = json.loads(Path(args.config).read_text())

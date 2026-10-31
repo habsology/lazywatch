@@ -428,6 +428,19 @@ class Ofrenda(unittest.TestCase):
         self.assertEqual(len(self.threads), 1)
         self.assertIn(g.fingerprint(g.ofrenda_key("Oct 25 to 31")), g.fingerprint(post["text"]))   # the live-feed check can find it
 
+    def test_redo_takes_the_old_one_down_first(self):
+        g.ofrenda(self.tmp, poster=self.poster, cards=FAKE_CARD, now=self.SAT)
+        gone = []
+        self.assertEqual(g.ofrenda(self.tmp, poster=self.poster, cards=FAKE_CARD, now=self.SAT, redo=True,
+                                   seen_live=lambda k: True, deleter=gone.append), 1)
+        self.assertEqual((gone, len(self.threads)), (["at://x/ofrenda"], 2))
+        self.assertEqual([p["kind"] for p in g.posts(self.tmp)][-3:], ["ofrenda", "ofrenda-withdrawn", "ofrenda"])
+
+        def stuck(uri):
+            raise OSError("no")
+        self.assertEqual(g.ofrenda(self.tmp, poster=self.poster, cards=FAKE_CARD, now=self.SAT, redo=True, deleter=stuck), 0)
+        self.assertEqual(len(self.threads), 2)                               # not taken down: nothing new posted
+
 
 class Throwback(unittest.TestCase):
     SITES = [{"name": "GeoCities", "url": "http://www.geocities.com/", "when": "20090601", "born": 1994, "died": 2009, "note": "n"},

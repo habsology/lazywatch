@@ -9,9 +9,9 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "post: the real thing. dry-run: write the verse, post nothing. rehearse: verse and cards for each service's last incident, posted nowhere. throwback / throwback-dry-run: the Thursday graves. ofrenda / ofrenda-dry-run: the Saturday altar."
+        description: "post: the real thing. dry-run: write the verse, post nothing. rehearse: verse and cards for each service's last incident, posted nowhere. throwback / throwback-dry-run: the Thursday graves. ofrenda / ofrenda-dry-run: the Saturday altar. ofrenda-redo: take down this week's ofrenda and post a corrected one."
         type: choice
-        options: [post, dry-run, rehearse, throwback, throwback-dry-run, ofrenda, ofrenda-dry-run]
+        options: [post, dry-run, rehearse, throwback, throwback-dry-run, ofrenda, ofrenda-dry-run, ofrenda-redo]
         default: post
 
 permissions:
@@ -136,6 +136,7 @@ jobs:
             throwback-dry-run) python lazywatch_ghost.py throwback --dry-run --out out ;;
             ofrenda)           ofrenda_once ;;
             ofrenda-dry-run)   python lazywatch_ghost.py ofrenda --dry-run --out out ;;
+            ofrenda-redo)      python lazywatch_ghost.py ofrenda --redo --out out ;;
             *)                 python lazywatch_ghost.py --out out
                                if [ "$(date -u +%u)" = 4 ] && [ "$(date -u +%H)" -ge 14 ]; then throwback_once; fi
                                if [ "$special_graves" -gt 0 ] && [ "$(date -u +%H)" -ge 14 ]; then throwback_once "$special_graves" "$special_occasion"; fi
