@@ -654,6 +654,10 @@ class BlueskyPoster:
         self.session = self.session or bsky_login()
         bsky_delete(self.session, uri)
 
+    def delete_key(self, key):
+        self.session = self.session or bsky_login()
+        bsky_delete(self.session, f"at://{self.session['did']}/app.bsky.feed.post/{key}")
+
 
 def print_poster(posts):
     """Dry run: show the thread, send nothing."""
@@ -932,7 +936,7 @@ def throwback(sites, state, ask=ask_model, poster=None, lookup=wayback, cards=re
         header = f"\U0001F56F️ {occasion}: in memoriam {site['name']} ({site['born']} to {site['died']})"
         posts_ = thread(header, [l for l in poem.splitlines() if l.strip()], quote, ("web.archive.org", url),
                         [card] if card else None)
-        shot = shooter(_as_it_was(url), site["name"]) if shooter else None
+        shot = shooter(_as_it_was(url), site["name"]) if shooter and site.get("shot") else None   # only pages checked by a person
         if shot and out_dir:                                                  # kept with the cards, so a dry run shows it
             Path(out_dir).mkdir(parents=True, exist_ok=True)
             (Path(out_dir) / f"grave-shot-{_slug(site['name'])}.jpg").write_bytes(shot["data"])
@@ -950,7 +954,7 @@ def throwback(sites, state, ask=ask_model, poster=None, lookup=wayback, cards=re
             _log(state, {"when": now.isoformat(), "kind": "throwback", "service": site["name"], "id": f"throwback:{site['name']}",
                          "form": "elegy", "title": site.get("note", ""), "quote": quote, "verified": verified,
                          "lines": len(poem.splitlines()), "posts": len(posts_), "key": throwback_key(site),
-                         "text": posts_[0]["text"], "uri": uris[0]})
+                         "text": posts_[0]["text"], "uri": uris[0], "uris": uris})
             lazywatch._store("record_change", {"site": f"ghost:throwback", "url": url, "summary": f"elegy for {site['name']}",
                                                "quote": quote, "verified": verified, "added": [poem] + paragraphs[:10]})
     return visited
@@ -1165,9 +1169,26 @@ def ofrenda(state, poster=None, cards=render_card, now=None, dry_run=False, out_
     return 1
 
 
+def withdraw(state, listed="withdraw.json", deleter=None, now=None):
+    """Takes down the account's own posts named in withdraw.json (their record keys, the last part of a post's
+    link), each once, logged. deleteRecord only reaches the account's own repo, so nobody else's post can be named."""
+    now = now or datetime.now(timezone.utc)
+    keys = json.loads(Path(listed).read_text()) if Path(listed).exists() else []
+    gone = {r.get("key") for r in posts(state) if r.get("kind") == "withdrawn"}
+    deleter = deleter or BlueskyPoster().delete_key
+    done = 0
+    for key in keys:
+        if key in gone or not re.fullmatch(r"[a-z0-9]{8,20}", str(key)):
+            continue
+        deleter(key)
+        _log(state, {"when": now.isoformat(), "kind": "withdrawn", "key": key})
+        done += 1
+    return done
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("command", nargs="?", default="haunt", choices=["haunt", "graveyard", "rehearse", "throwback", "ofrenda"])
+    ap.add_argument("command", nargs="?", default="haunt", choices=["haunt", "graveyard", "rehearse", "throwback", "ofrenda", "withdraw"])
     ap.add_argument("--config", default="statuspages.json")
     ap.add_argument("--graves", default="throwback.json")
     ap.add_argument("--state", default="state")
@@ -1190,6 +1211,12 @@ def main(argv=None):
                       occasion=args.occasion)
         print(f"{n} graves visited" + (" (dry run)" if dry else ""))
         return 0 if n or dry else 3                      # nothing visited: the workflow does not count this run
+    if args.command == "withdraw":
+        if dry:
+            print("withdraw needs BLUESKY_APP_PASSWORD; nothing taken down")
+            return 0
+        print(f"{withdraw(args.state)} posts taken down")
+        return 0
     if args.command == "ofrenda":
         n = ofrenda(args.state, dry_run=dry, out_dir=args.out, redo=args.redo)
         print(("ofrenda posted" if n else "no ofrenda") + (" (dry run)" if dry else ""))

@@ -442,8 +442,20 @@ class Ofrenda(unittest.TestCase):
         self.assertEqual(len(self.threads), 2)                               # not taken down: nothing new posted
 
 
+class Withdraw(unittest.TestCase):
+    def test_listed_posts_come_down_once(self):
+        tmp = tempfile.mkdtemp()
+        listed = Path(tmp) / "withdraw.json"
+        listed.write_text('["3mz6o37iklw25", "not a key!"]')
+        gone = []
+        self.assertEqual(g.withdraw(tmp, listed, deleter=gone.append, now=NOW), 1)
+        self.assertEqual(g.withdraw(tmp, listed, deleter=gone.append, now=NOW), 0)       # once only
+        self.assertEqual(gone, ["3mz6o37iklw25"])
+
+
 class Throwback(unittest.TestCase):
-    SITES = [{"name": "GeoCities", "url": "http://www.geocities.com/", "when": "20090601", "born": 1994, "died": 2009, "note": "n"},
+    SITES = [{"name": "GeoCities", "url": "http://www.geocities.com/", "when": "20090601", "born": 1994, "died": 2009, "note": "n",
+              "shot": True},
              {"name": "Vine", "url": "https://vine.co/", "when": "20160901", "born": 2013, "died": 2017, "note": "n"},
              {"name": "Orkut", "url": "http://www.orkut.com/", "when": "20120601", "born": 2004, "died": 2014, "note": "n"},
              {"name": "Napster", "url": "http://www.napster.com/", "when": "20000601", "born": 1999, "died": 2001, "note": "n"}]
