@@ -1,3 +1,5 @@
+import contextlib
+import io
 import json
 import tempfile
 import unittest
@@ -474,6 +476,26 @@ class Throwback(unittest.TestCase):
             raise LookupError("no snapshot")
         return (f"https://web.archive.org/web/20090601/{site['url']}",
                 ["Welcome to the neighbourhood.", "Get a free home page today and join millions of members."], "Last seen June 1, 2009")
+
+    def test_probe_reports_every_unvisited_grave_and_posts_nothing(self):
+        g.save_state(self.tmp, ["GeoCities"], "throwback.json")                      # visited last week: not looked up again
+        looked, lines = [], []
+        def lookup(site):
+            looked.append(site["name"])
+            if site["name"] == "Orkut":
+                return ("u", [], "")
+            return self.lookup(site)
+        with contextlib.redirect_stdout(io.StringIO()) as out:
+            n = g.probe_graves(self.SITES, self.tmp, lookup=lookup, pause=0)
+        lines = out.getvalue().splitlines()
+        self.assertEqual(looked, ["Vine", "Orkut", "Napster"])
+        self.assertEqual(n, 1)
+        self.assertIn("Vine: grave not found (LookupError: no snapshot)", lines)
+        self.assertIn("Orkut: the saved page has no words", lines)
+        self.assertTrue(any(l.startswith("Napster: 2 paragraphs, Last seen June 1, 2009: Welcome") for l in lines), lines)
+        self.assertEqual(lines[-1], "1 of 3 unvisited graves have words")
+        self.assertEqual(self.threads, [])
+        self.assertEqual(g.load_state(self.tmp, "throwback.json", []), ["GeoCities"])   # a probe marks nothing visited
 
     def test_wayback_lookup_builds_raw_url_and_paragraphs(self):
         calls = []

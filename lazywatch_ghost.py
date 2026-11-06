@@ -32,6 +32,7 @@ import json
 import os
 import re
 import sys
+import time
 import unicodedata
 import urllib.parse
 import urllib.request
@@ -877,6 +878,29 @@ def wayback(site, fetch_json=None, fetch_html=None):
     return url, [p for p in paragraphs if len(p) >= 30 and about_the_site(p, site["name"])][:40], seen
 
 
+def probe_graves(sites, state, lookup=wayback, pause=3):
+    """Every grave the coming Thursdays would visit, looked up and nothing more: which saved pages have words
+    the elegy can quote, which are missing or empty. One line per unvisited site, no model, no post."""
+    done = load_state(state, "throwback.json", [])
+    waiting = [s for s in sites if s["name"] not in done]
+    good = 0
+    for i, site in enumerate(waiting):
+        if i and pause:
+            time.sleep(pause)                                # archive.org rate-limits a burst of lookups
+        try:
+            url, paragraphs, seen = lookup(site)
+        except Exception as exc:
+            print(f"{site['name']}: grave not found ({exc.__class__.__name__}: {str(exc)[:60]})")
+            continue
+        if not paragraphs:
+            print(f"{site['name']}: the saved page has no words")
+            continue
+        good += 1
+        print(f"{site['name']}: {len(paragraphs)} paragraphs, {seen or 'date unknown'}: {paragraphs[0][:90]}")
+    print(f"{good} of {len(waiting)} unvisited graves have words")
+    return good
+
+
 def throwback_prompt(site, paragraphs, occasion="Throwback Thursday"):
     text = "\n".join(f"- {p[:300]}" for p in paragraphs[:25])
     return (
@@ -1198,6 +1222,7 @@ def main(argv=None):
     ap.add_argument("--out", help="folder for the rendered cards")
     ap.add_argument("--dry-run", action="store_true", help="write the verse, post nothing, change nothing")
     ap.add_argument("--redo", action="store_true", help="take down this week's ofrenda and post a corrected one (ofrenda)")
+    ap.add_argument("--probe", action="store_true", help="look every unvisited grave up and report; no verse, no post (throwback)")
     args = ap.parse_args(argv)
     if args.command == "graveyard":
         print(graveyard(args.state))
@@ -1207,6 +1232,9 @@ def main(argv=None):
         print("BLUESKY_APP_PASSWORD not set: dry run", file=sys.stderr)
     if args.command == "throwback":
         sites = json.loads(Path(args.graves).read_text())
+        if args.probe:
+            probe_graves(sites, args.state)
+            return 0
         n = throwback(sites, args.state, dry_run=dry, count=args.count, out_dir=args.out,
                       occasion=args.occasion)
         print(f"{n} graves visited" + (" (dry run)" if dry else ""))
