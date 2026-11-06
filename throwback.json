@@ -9,8 +9,8 @@
   },
   {
     "name": "Google Reader",
-    "url": "http://reader.google.com/",
-    "when": "20081118",
+    "url": "http://www.google.com/reader/about/",
+    "when": "20130301",
     "born": 2005,
     "died": 2013,
     "note": "the RSS reader Google switched off on July 1, 2013"
@@ -42,7 +42,7 @@
   {
     "name": "Vine",
     "url": "https://vine.co/",
-    "when": "20160901",
+    "when": "20140601",
     "born": 2013,
     "died": 2017,
     "note": "six-second videos, looped forever"
@@ -58,7 +58,7 @@
   {
     "name": "AOL Instant Messenger",
     "url": "http://www.aim.com/",
-    "when": "20170601",
+    "when": "20060601",
     "born": 1997,
     "died": 2017,
     "note": "away messages and the door-creak sound"
@@ -94,5 +94,341 @@
     "born": 1996,
     "died": 2006,
     "note": "a butler who answered questions, retired to plain Ask.com"
+  },
+  {
+    "name": "Google Wave",
+    "url": "http://wave.google.com/",
+    "when": "20100601",
+    "born": 2009,
+    "died": 2012,
+    "note": "email, chat and a wiki in one scrolling wave, gone before most people got an invite"
+  },
+  {
+    "name": "Google Buzz",
+    "url": "http://www.google.com/buzz",
+    "when": "20100601",
+    "born": 2010,
+    "died": 2011,
+    "note": "a social feed bolted onto Gmail, switched off after twenty months"
+  },
+  {
+    "name": "iGoogle",
+    "url": "http://www.google.com/ig",
+    "when": "20100601",
+    "born": 2005,
+    "died": 2013,
+    "note": "a start page of widgets, weather and a fox that ate your cursor"
+  },
+  {
+    "name": "Google Video",
+    "url": "http://video.google.com/",
+    "when": "20070601",
+    "born": 2005,
+    "died": 2012,
+    "note": "Google's own video site, outlived by the one it bought"
+  },
+  {
+    "name": "Google Answers",
+    "url": "http://answers.google.com/",
+    "when": "20040601",
+    "born": 2002,
+    "died": 2006,
+    "note": "paid researchers answered your question for a few dollars"
+  },
+  {
+    "name": "Picasa Web Albums",
+    "url": "http://picasaweb.google.com/",
+    "when": "20100601",
+    "born": 2006,
+    "died": 2016,
+    "note": "where a generation's holiday photos lived before Google Photos"
+  },
+  {
+    "name": "Google Code",
+    "url": "http://code.google.com/",
+    "when": "20120601",
+    "born": 2006,
+    "died": 2016,
+    "note": "project hosting for open source, closed as everyone moved to GitHub"
+  },
+  {
+    "name": "Google Talk",
+    "url": "http://www.google.com/talk/",
+    "when": "20080601",
+    "born": 2005,
+    "died": 2013,
+    "note": "the chat in the corner of Gmail, retired for Hangouts"
+  },
+  {
+    "name": "Google Hangouts",
+    "url": "https://hangouts.google.com/",
+    "when": "20170601",
+    "born": 2013,
+    "died": 2022,
+    "note": "video calls for ten friends, replaced by Meet and Chat"
+  },
+  {
+    "name": "Google Play Music",
+    "url": "https://play.google.com/music/",
+    "when": "20180601",
+    "born": 2011,
+    "died": 2020,
+    "note": "upload fifty thousand songs and stream them anywhere, until YouTube Music"
+  },
+  {
+    "name": "Stadia",
+    "url": "https://stadia.google.com/",
+    "when": "20210601",
+    "born": 2019,
+    "died": 2023,
+    "note": "games streamed from the cloud, refunded in full when it closed"
+  },
+  {
+    "name": "MSN Messenger",
+    "url": "http://messenger.msn.com/",
+    "when": "20050601",
+    "born": 1999,
+    "died": 2013,
+    "note": "nudges, winks and the after-school chat of a generation"
+  },
+  {
+    "name": "Windows Live Spaces",
+    "url": "http://spaces.live.com/",
+    "when": "20080601",
+    "born": 2004,
+    "died": 2011,
+    "note": "Microsoft's blogs, moved to WordPress when it closed"
+  },
+  {
+    "name": "Yahoo! Messenger",
+    "url": "http://messenger.yahoo.com/",
+    "when": "20080601",
+    "born": 1998,
+    "died": 2018,
+    "note": "twenty years of chat rooms and buzzing windows"
+  },
+  {
+    "name": "Yahoo! Pipes",
+    "url": "http://pipes.yahoo.com/",
+    "when": "20100601",
+    "born": 2007,
+    "died": 2015,
+    "note": "drag-and-drop plumbing for feeds, loved by tinkerers"
+  },
+  {
+    "name": "Yahoo! Groups",
+    "url": "http://groups.yahoo.com/",
+    "when": "20100601",
+    "born": 2001,
+    "died": 2020,
+    "note": "mailing lists for every hobby, archives deleted at the end"
+  },
+  {
+    "name": "Yahoo! Directory",
+    "url": "http://dir.yahoo.com/",
+    "when": "20100601",
+    "born": 1994,
+    "died": 2014,
+    "note": "the web sorted by hand into categories, where Yahoo began"
+  },
+  {
+    "name": "Delicious",
+    "url": "http://del.icio.us/",
+    "when": "20080601",
+    "born": 2003,
+    "died": 2017,
+    "note": "social bookmarks with tags, and a domain name that was a pun"
+  },
+  {
+    "name": "StumbleUpon",
+    "url": "http://www.stumbleupon.com/",
+    "when": "20100601",
+    "born": 2001,
+    "died": 2018,
+    "note": "one button that took you somewhere random and good"
+  },
+  {
+    "name": "Bebo",
+    "url": "http://www.bebo.com/",
+    "when": "20080601",
+    "born": 2005,
+    "died": 2013,
+    "note": "the social network of British and Irish teenagers"
+  },
+  {
+    "name": "Grooveshark",
+    "url": "http://grooveshark.com/",
+    "when": "20120601",
+    "born": 2007,
+    "died": 2015,
+    "note": "any song on demand, free, which was the problem"
+  },
+  {
+    "name": "Rdio",
+    "url": "http://www.rdio.com/",
+    "when": "20130601",
+    "born": 2010,
+    "died": 2015,
+    "note": "the prettiest music streaming app, sold to Pandora"
+  },
+  {
+    "name": "Turntable.fm",
+    "url": "http://turntable.fm/",
+    "when": "20120601",
+    "born": 2011,
+    "died": 2013,
+    "note": "take turns playing DJ for a room of avatars"
+  },
+  {
+    "name": "Path",
+    "url": "https://path.com/",
+    "when": "20130601",
+    "born": 2010,
+    "died": 2018,
+    "note": "a social network capped at 150 friends"
+  },
+  {
+    "name": "FriendFeed",
+    "url": "http://friendfeed.com/",
+    "when": "20090601",
+    "born": 2007,
+    "died": 2015,
+    "note": "every feed in one place, bought by Facebook and switched off"
+  },
+  {
+    "name": "Posterous",
+    "url": "http://posterous.com/",
+    "when": "20110601",
+    "born": 2008,
+    "died": 2013,
+    "note": "blog by sending an email, bought by Twitter and closed"
+  },
+  {
+    "name": "Yik Yak",
+    "url": "http://www.yikyakapp.com/",
+    "when": "20150601",
+    "born": 2013,
+    "died": 2017,
+    "note": "anonymous posts from whoever was within a few miles"
+  },
+  {
+    "name": "Periscope",
+    "url": "https://www.periscope.tv/",
+    "when": "20170601",
+    "born": 2015,
+    "died": 2021,
+    "note": "live video from a phone, with hearts floating up the screen"
+  },
+  {
+    "name": "Mixer",
+    "url": "https://mixer.com/",
+    "when": "20190601",
+    "born": 2016,
+    "died": 2020,
+    "note": "Microsoft's game streaming site, closed after four years"
+  },
+  {
+    "name": "LimeWire",
+    "url": "http://www.limewire.com/",
+    "when": "20080601",
+    "born": 2000,
+    "died": 2010,
+    "note": "file sharing in green and yellow, ordered shut by a court"
+  },
+  {
+    "name": "Kazaa",
+    "url": "http://www.kazaa.com/",
+    "when": "20030601",
+    "born": 2001,
+    "died": 2012,
+    "note": "the download that came with extra software you did not ask for"
+  },
+  {
+    "name": "ICQ",
+    "url": "http://www.icq.com/",
+    "when": "20050601",
+    "born": 1996,
+    "died": 2024,
+    "note": "uh-oh, you have a message: the first chat app, closed after twenty-eight years"
+  },
+  {
+    "name": "Skype",
+    "url": "http://www.skype.com/",
+    "when": "20100601",
+    "born": 2003,
+    "died": 2025,
+    "note": "the call that cost nothing, retired by Microsoft in May 2025"
+  },
+  {
+    "name": "Club Penguin",
+    "url": "http://www.clubpenguin.com/",
+    "when": "20100601",
+    "born": 2005,
+    "died": 2017,
+    "note": "waddling penguins and igloos, the safest place on the internet for a decade"
+  },
+  {
+    "name": "Miiverse",
+    "url": "https://miiverse.nintendo.net/",
+    "when": "20150601",
+    "born": 2012,
+    "died": 2017,
+    "note": "hand-drawn posts from Wii U and 3DS players"
+  },
+  {
+    "name": "Picnik",
+    "url": "http://www.picnik.com/",
+    "when": "20100601",
+    "born": 2005,
+    "died": 2012,
+    "note": "photo editing in the browser, bought by Google and closed"
+  },
+  {
+    "name": "CompuServe",
+    "url": "http://www.compuserve.com/",
+    "when": "20000601",
+    "born": 1969,
+    "died": 2009,
+    "note": "the online service before the web, with forums and hourly fees"
+  },
+  {
+    "name": "Justin.tv",
+    "url": "http://www.justin.tv/",
+    "when": "20110601",
+    "born": 2007,
+    "died": 2014,
+    "note": "one man's life streamed live, which became Twitch"
+  },
+  {
+    "name": "Joost",
+    "url": "http://www.joost.com/",
+    "when": "20080601",
+    "born": 2007,
+    "died": 2009,
+    "note": "television over peer-to-peer, from the people who made Skype"
+  },
+  {
+    "name": "Dodgeball",
+    "url": "http://www.dodgeball.com/",
+    "when": "20070601",
+    "born": 2000,
+    "died": 2009,
+    "note": "check in by text message, years before Foursquare"
+  },
+  {
+    "name": "Pownce",
+    "url": "http://pownce.com/",
+    "when": "20080601",
+    "born": 2007,
+    "died": 2008,
+    "note": "share files and events with friends, gone in eighteen months"
+  },
+  {
+    "name": "Multiply",
+    "url": "http://multiply.com/",
+    "when": "20090601",
+    "born": 2004,
+    "died": 2013,
+    "note": "photo sharing for families, big in Southeast Asia"
   }
 ]

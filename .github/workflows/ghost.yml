@@ -9,9 +9,9 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "post: the real thing. dry-run: write the verse, post nothing. rehearse: verse and cards for each service's last incident, posted nowhere. throwback / throwback-dry-run: the Thursday graves. ofrenda / ofrenda-dry-run: the Saturday altar. ofrenda-redo: take down this week's ofrenda and post a corrected one. withdraw: take down the posts listed in withdraw.json."
+        description: "post: the real thing. dry-run: write the verse, post nothing. rehearse: verse and cards for each service's last incident, posted nowhere. throwback / throwback-dry-run: the Thursday graves. throwback-probe: look every unvisited grave up, post nothing. ofrenda / ofrenda-dry-run: the Saturday altar. ofrenda-redo: take down this week's ofrenda and post a corrected one. withdraw: take down the posts listed in withdraw.json."
         type: choice
-        options: [post, dry-run, rehearse, throwback, throwback-dry-run, ofrenda, ofrenda-dry-run, ofrenda-redo, withdraw]
+        options: [post, dry-run, rehearse, throwback, throwback-dry-run, throwback-probe, ofrenda, ofrenda-dry-run, ofrenda-redo, withdraw]
         default: post
 
 permissions:
@@ -134,6 +134,7 @@ jobs:
             dry-run)           python lazywatch_ghost.py --dry-run --out out ;;
             throwback)         throwback_once ;;
             throwback-dry-run) python lazywatch_ghost.py throwback --dry-run --out out ;;
+            throwback-probe)   python lazywatch_ghost.py throwback --probe ;;
             ofrenda)           ofrenda_once ;;
             ofrenda-dry-run)   python lazywatch_ghost.py ofrenda --dry-run --out out ;;
             ofrenda-redo)      python lazywatch_ghost.py ofrenda --redo --out out ;;
