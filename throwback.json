@@ -158,5 +158,61 @@
     "born": 1969,
     "died": 2009,
     "note": "the online service before the web, with forums and hourly fees"
+  },
+  {
+    "name": "ICQ",
+    "url": "http://www.icq.com/",
+    "when": "20050601",
+    "born": 1996,
+    "died": 2024,
+    "note": "uh-oh, you have a message: the first chat app, closed after twenty-eight years"
+  },
+  {
+    "name": "Skype",
+    "url": "http://www.skype.com/",
+    "when": "20100601",
+    "born": 2003,
+    "died": 2025,
+    "note": "the call that cost nothing, retired by Microsoft in May 2025"
+  },
+  {
+    "name": "Grooveshark",
+    "url": "http://grooveshark.com/",
+    "when": "20120601",
+    "born": 2007,
+    "died": 2015,
+    "note": "any song on demand, free, which was the problem"
+  },
+  {
+    "name": "Google Hangouts",
+    "url": "https://hangouts.google.com/",
+    "when": "20170601",
+    "born": 2013,
+    "died": 2022,
+    "note": "video calls for ten friends, replaced by Meet and Chat"
+  },
+  {
+    "name": "Joost",
+    "url": "http://www.joost.com/",
+    "when": "20080601",
+    "born": 2007,
+    "died": 2009,
+    "note": "television over peer-to-peer, from the people who made Skype"
+  },
+  {
+    "name": "Bebo",
+    "url": "http://www.bebo.com/",
+    "when": "20080601",
+    "born": 2005,
+    "died": 2013,
+    "note": "the social network of British and Irish teenagers"
+  },
+  {
+    "name": "StumbleUpon",
+    "url": "http://www.stumbleupon.com/",
+    "when": "20100601",
+    "born": 2001,
+    "died": 2018,
+    "note": "one button that took you somewhere random and good"
   }
 ]
