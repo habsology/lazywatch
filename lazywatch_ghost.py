@@ -4,7 +4,8 @@ Every hour it reads the official status feed of each service in statuspages.json
 When a new incident appears, Gemma 3 4B writes a short ode (or a ballad, a hymn, a
 limerick, a sea shanty...) that pokes gentle fun at the outage. The ghost posts it to
 Bluesky on an image card, with the date, one sentence quoted word for word from the
-status page and a link to the source; a long poem continues in replies to its own post.
+status page and a link to the source, in ONE post (the whole poem is on the card). The
+only reply is a screenshot of the status page, when there is one.
 When the incident clears, a short resurrection notice follows. Scheduled maintenance is
 ignored: nobody died. On Thursdays the ghost visits three graves of the old web through
 the Wayback Machine (throwback.json) and writes each an elegy from what the page used to say.
@@ -22,7 +23,7 @@ replies to anyone else, never follows and never messages (there is simply no cod
     python lazywatch_ghost.py throwback --dry-run
     python lazywatch_ghost.py graveyard          # what the ghost has seen so far
 
-Optional: BROWSERBASE_API_KEY adds a screenshot of the status page as a second image;
+Optional: BROWSERBASE_API_KEY adds a screenshot of the status page as the post's one reply;
 TIGER_DATABASE_URL keeps every haunting in the Tiger Data memory (lazywatch_store.py).
 Cards need Playwright with Chromium (ghost_card.py); without it the posts go out as text.
 """
@@ -384,7 +385,7 @@ def _duration(start_iso, end):
     return " ".join(parts)
 
 
-# ---------------------------------------------------------------- posts and threads
+# ---------------------------------------------------------------- posts (one per incident, plus a screenshot reply)
 def link_facet(text, display, url):
     """A clickable `display` inside `text`, as Bluesky wants it: UTF-8 byte offsets."""
     start = text.rfind(display)
@@ -401,51 +402,36 @@ def _post(text, link=None, images=None):
     return {"text": text, "facets": link_facet(text, display, url) if link else [], "images": images or []}
 
 
-def thread(header, lines, quote, link, images=None):
-    """Split header, verse, quote and source link over as few posts as possible, each under the limit, the
-    lines shared out evenly between the posts. The first post always carries the source link and the images;
-    the quote comes last."""
+def single_post(header, lines, quote, link, images=None):
+    """One post, never a thread: header, the verse when all of it fits, the quote, and the source link, with the
+    images. The card already carries the whole poem (and its alt text reads it out), so a verse too long for the
+    post is left to the card rather than continued in replies. Without a card, as many lines as fit, then "…"."""
     display, _url = link
     source = f"Source: {display}"
 
-    def body(chunk, with_header, with_quote):
-        parts = ([header] if with_header else []) + (["\n".join(chunk)] if chunk else [])
-        if with_quote:
-            parts.append(f"\u201c{quote}\u201d")
-        if with_header:
-            parts.append(source)
-        return "\n\n".join(parts)
+    def body(chunk, q, more=False):
+        verse = "\n".join(chunk) + ("\n…" if more else "")
+        return "\n\n".join([header] + ([verse] if chunk else []) + [f"\u201c{q}\u201d", source])
 
     def fits(text):
         return _length(text) <= POST_LIMIT
 
-    lines = [_shorten(l, POST_LIMIT - _length(body([], True, False)) - 4) for l in lines]
-    plan = None
-    for n in range(1, max(len(lines), 1) + 1):            # the fewest posts whose even share of lines fits
-        base, extra = divmod(len(lines), n)
-        sizes = [base + (1 if i >= n - extra else 0) for i in range(n)]   # the first post, with the header, gets the smaller share
-        chunks, at = [], 0
-        for size in sizes:
-            chunks.append(lines[at:at + size])
-            at += size
-        if all(fits(body(c, i == 0, False)) for i, c in enumerate(chunks)):
-            plan = chunks
-            break
-    plan = plan or [lines]
-    if fits(body(plan[-1], len(plan) == 1, True)):
-        texts = [body(c, i == 0, i == len(plan) - 1) for i, c in enumerate(plan)]
+    room = POST_LIMIT - _length(body([], ""))                  # what the quote may take with no verse at all
+    quote = _shorten(quote, max(room, 12))
+    if fits(body(lines, quote)):
+        text = body(lines, quote)
+    elif images:
+        text = body([], quote)
     else:
-        texts = [body(c, i == 0, False) for i, c in enumerate(plan)]
-        room = POST_LIMIT - 2
-        texts.append(f"\u201c{_shorten(quote, room)}\u201d")
-    if not fits(texts[-1]):                               # a long quote on a single post: a shorter prefix is still verbatim
-        room = POST_LIMIT - _length(texts[-1]) + _length(quote)
-        texts[-1] = texts[-1].replace(f"\u201c{quote}\u201d", f"\u201c{_shorten(quote, max(room, 12))}\u201d")
-    return [_post(t, link if i == 0 else None, images if i == 0 else None) for i, t in enumerate(texts) if t.strip()]
+        n = len(lines) - 1
+        while n > 0 and not fits(body(lines[:n], quote, True)):
+            n -= 1
+        text = body(lines[:n], quote, True) if n > 0 else body([], quote)
+    return _post(text, link, images)
 
 
 def status_post(incident, shot=None, now=None):
-    """The thread's last post: the status page itself, written the way people search for an outage
+    """The haunting's only reply, posted only with a screenshot: the status page itself, written the way people search for an outage
     ("Is GitHub down?"): the product's name, what its status page reports, since when, and when the
     screenshot was taken. The screenshot is its only image."""
     now = now or datetime.now(timezone.utc)
@@ -467,14 +453,15 @@ def status_post(incident, shot=None, now=None):
 
 
 def haunting_thread(incident, form, poem, quote, images=None, shot=None, now=None):
-    """The verse (card on the first post, quote last), then the status page as the closing post."""
+    """One post (the card, the header, the quote and the source). The only reply is the screenshot of the status
+    page, and only when there is one: no screenshot, no reply."""
     header = f"\U0001F47B {HEADLINE[form]} {incident['service']}"
     since = _when(incident["since"])
     if since:
         header += f", down since {since}"
     lines = [l for l in poem.splitlines() if l.strip()]
-    verse = thread(header, lines, quote, (_host(incident.get("page") or incident["url"]), incident["url"]), images)
-    return verse + [status_post(incident, shot, now)]
+    post = single_post(header, lines, quote, (_host(incident.get("page") or incident["url"]), incident["url"]), images)
+    return [post] + ([status_post(incident, shot, now)] if shot else [])
 
 
 def resurrection_thread(service, entry, now, images=None):
@@ -636,7 +623,7 @@ def bsky_delete(session, uri):
 
 
 class BlueskyPoster:
-    """Posts a thread for real: the first post, then each next one as a reply to the previous. Logs in once."""
+    """Posts for real: the post, then the screenshot (if any) as its reply. Logs in once."""
     def __init__(self):
         self.session = None
 
@@ -958,13 +945,14 @@ def throwback(sites, state, ask=ask_model, poster=None, lookup=wayback, cards=re
         spec = card_spec("throwback", poem=poem, quote=quote, site=dict(site, seen=seen, occasion=occasion))
         card = cards(spec, out_dir, f"throwback-{_slug(site['name'])}") if cards else None
         header = f"\U0001F56F️ {occasion}: in memoriam {site['name']} ({site['born']} to {site['died']})"
-        posts_ = thread(header, [l for l in poem.splitlines() if l.strip()], quote, ("web.archive.org", url),
-                        [card] if card else None)
+        posts_ = [single_post(header, [l for l in poem.splitlines() if l.strip()], quote, ("web.archive.org", url),
+                              [card] if card else None)]
         shot = shooter(_as_it_was(url), site["name"]) if shooter and site.get("shot") else None   # only pages checked by a person
         if shot and out_dir:                                                  # kept with the cards, so a dry run shows it
             Path(out_dir).mkdir(parents=True, exist_ok=True)
             (Path(out_dir) / f"grave-shot-{_slug(site['name'])}.jpg").write_bytes(shot["data"])
-        posts_.append(grave_post(site, url, seen, shot))
+        if shot:                                                              # the only reply: the page itself
+            posts_.append(grave_post(site, url, seen, shot))
         try:
             uris = poster(posts_)
         except Exception as exc:
@@ -992,7 +980,7 @@ def _as_it_was(url):
 
 
 def grave_post(site, url, seen, shot=None):
-    """The closing post of a grave: the home page as it last looked, from the Wayback Machine."""
+    """A grave's only reply, posted only with a screenshot: the home page as it last looked, from the Wayback Machine."""
     when = seen.replace("Last seen ", "") if seen else ""
     text = (f"{site['name']} as it looked" + (f" on {when}" if when else "") + ", the last time the Wayback Machine visited."
             + "\n\nSource: web.archive.org")
